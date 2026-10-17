@@ -91,7 +91,7 @@ fun SettingsScreen(vm: AppViewModel, nav: NavHostController) {
         Section("Language") {
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 listOf("hindi" to "हिंदी", "hinglish" to "Hinglish", "english" to "English").forEach { (k, l) ->
-                    FilterChip(selected = vm.language == k, onClick = { vm.setLanguage(k) }, label = { Text(l) })
+                    FilterChip(selected = vm.language == k, onClick = { vm.changeLanguage(k) }, label = { Text(l) })
                 }
             }
             Text("Bolne ki bhasha (speech recognition) bhi isi se set hoti hai.", style = MaterialTheme.typography.bodySmall)
@@ -99,7 +99,7 @@ fun SettingsScreen(vm: AppViewModel, nav: NavHostController) {
 
         Section("Personality") {
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Personas.names.forEach { n -> FilterChip(selected = vm.persona == n, onClick = { vm.setPersona(n) }, label = { Text(n) }) }
+                Personas.names.forEach { n -> FilterChip(selected = vm.persona == n, onClick = { vm.changePersona(n) }, label = { Text(n) }) }
             }
         }
 
@@ -134,11 +134,11 @@ fun SettingsScreen(vm: AppViewModel, nav: NavHostController) {
         Section("Memory") {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Memory on", Modifier.weight(1f))
-                Switch(checked = vm.memoryEnabled, onCheckedChange = { vm.setMemoryEnabled(it) })
+                Switch(checked = vm.memoryEnabled, onCheckedChange = { vm.changeMemoryEnabled(it) })
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Chat history phone par save karo", Modifier.weight(1f))
-                Switch(checked = vm.saveHistory, onCheckedChange = { vm.setSaveHistory(it) })
+                Switch(checked = vm.saveHistory, onCheckedChange = { vm.changeSaveHistory(it) })
             }
             Text("History sirf is phone par rehti hai. Gemini ko har baar sirf haal ke kuch messages bheje jaate hain.", style = MaterialTheme.typography.bodySmall)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -151,7 +151,7 @@ fun SettingsScreen(vm: AppViewModel, nav: NavHostController) {
         Section("Theme") {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 listOf("system", "dark", "light").forEach { t ->
-                    FilterChip(selected = vm.theme == t, onClick = { vm.setTheme(t) }, label = { Text(t) })
+                    FilterChip(selected = vm.theme == t, onClick = { vm.changeTheme(t) }, label = { Text(t) })
                 }
             }
         }

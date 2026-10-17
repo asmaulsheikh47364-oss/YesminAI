@@ -193,7 +193,7 @@ fun ChatScreen(vm: AppViewModel) {
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Personas.names.forEach { n ->
-                FilterChip(selected = vm.persona == n, onClick = { vm.setPersona(n) }, label = { Text(n) })
+                FilterChip(selected = vm.persona == n, onClick = { vm.changePersona(n) }, label = { Text(n) })
             }
         }
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {

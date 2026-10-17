@@ -58,13 +58,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---------- settings ----------
     fun setModelName(v: String) { model = v.trim(); prefs.model = model }
-    fun setPersona(v: String) { persona = v; prefs.persona = v }
-    fun setLanguage(v: String) { language = v; prefs.language = v; voiceName = null; prefs.voiceName = null }
-    fun setTheme(v: String) { theme = v; prefs.theme = v }
-    fun setTemperature(v: Float) { temperature = v; prefs.temperature = v }
+    fun changePersona(v: String) { persona = v; prefs.persona = v }
+    fun changeLanguage(v: String) { language = v; prefs.language = v; voiceName = null; prefs.voiceName = null }
+    fun changeTheme(v: String) { theme = v; prefs.theme = v }
+    fun changeTemperature(v: Float) { temperature = v; prefs.temperature = v }
     fun setVoice(v: String?) { voiceName = v; prefs.voiceName = v }
-    fun setMemoryEnabled(v: Boolean) { memoryEnabled = v; prefs.memoryEnabled = v }
-    fun setSaveHistory(v: Boolean) { saveHistory = v; prefs.saveHistory = v }
+    fun changeMemoryEnabled(v: Boolean) { memoryEnabled = v; prefs.memoryEnabled = v }
+    fun changeSaveHistory(v: Boolean) { saveHistory = v; prefs.saveHistory = v }
     fun acceptDisclosure() { disclosure = true; prefs.disclosure = true }
     fun resetDisclosure() { disclosure = false; prefs.disclosure = false }
     fun voiceNames(): List<String> = voice.voices(language)

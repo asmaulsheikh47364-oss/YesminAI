@@ -109,7 +109,7 @@ fun BrainScreen(vm: AppViewModel) {
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp)) {
                 Text("Temperature: " + String.format(Locale.US, "%.1f", vm.temperature), fontWeight = FontWeight.Bold)
-                Slider(value = vm.temperature, onValueChange = { vm.setTemperature(it) }, valueRange = 0f..2f)
+                Slider(value = vm.temperature, onValueChange = { vm.changeTemperature(it) }, valueRange = 0f..2f)
                 Text("Kam = seedha/pakka jawab, zyada = creative.", style = MaterialTheme.typography.bodySmall)
             }
         }
