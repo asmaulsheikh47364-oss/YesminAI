@@ -1,6 +1,7 @@
 package com.yesmin.ai
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
@@ -51,7 +52,15 @@ class GeminiClient {
             }
             body.put("contents", contents)
             body.put("generationConfig", JSONObject().put("temperature", temperature.toDouble()))
-            val (code, resp) = request("POST", "$base/models/$m:generateContent", key, body.toString())
+            var r = request("POST", "$base/models/$m:generateContent", key, body.toString())
+            var tries = 0
+            while ((r.first == 503 || r.first == 500) && tries < 3) {
+                tries++
+                delay(2000L * tries)
+                r = request("POST", "$base/models/$m:generateContent", key, body.toString())
+            }
+            val code = r.first
+            val resp = r.second
             if (code != 200) return@withContext AiResult(false, friendly(code, resp, m))
             val j = JSONObject(resp)
             val cands = j.optJSONArray("candidates")

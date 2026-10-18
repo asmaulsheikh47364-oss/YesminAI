@@ -60,7 +60,7 @@ fun RichText(text: String, onSave: ((String) -> Unit)? = null) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         parts.forEachIndexed { i, p ->
             if (i % 2 == 0) {
-                if (p.isNotBlank()) Text(p.trim())
+                if (p.isNotBlank()) Text(p.trim().replace("**", "").replace(Regex("(?m)^\\* "), "• "))
             } else {
                 CodeBlock(p, onSave)
             }

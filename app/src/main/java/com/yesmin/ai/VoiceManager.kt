@@ -79,7 +79,7 @@ class VoiceManager(private val ctx: Context, private val onState: (VoiceState) -
     }
 
     /** Returns false if speech could not start (engine missing or language unsupported). */
-    fun speak(raw: String, language: String, voiceName: String?, finished: () -> Unit): Boolean {
+    fun speak(raw: String, language: String, voiceName: String?, pitch: Float, rate: Float, finished: () -> Unit): Boolean {
         val t = tts
         if (t == null || !ttsReady) { finished(); return false }
         val clean = speakable(raw)
@@ -88,6 +88,8 @@ class VoiceManager(private val ctx: Context, private val onState: (VoiceState) -
         val res = t.setLanguage(loc)
         if (res == TextToSpeech.LANG_MISSING_DATA || res == TextToSpeech.LANG_NOT_SUPPORTED) { finished(); return false }
         if (voiceName != null) t.voices?.firstOrNull { it.name == voiceName }?.let { t.voice = it }
+        t.setPitch(pitch)
+        t.setSpeechRate(rate)
         t.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
             override fun onStart(utteranceId: String?) { main.post { onState(VoiceState.Speaking) } }
             override fun onDone(utteranceId: String?) { main.post { finished() } }

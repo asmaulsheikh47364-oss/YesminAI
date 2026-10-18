@@ -45,6 +45,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var temperature by mutableStateOf(prefs.temperature)
     var voiceName by mutableStateOf(prefs.voiceName)
     var disclosure by mutableStateOf(prefs.disclosure)
+    var voicePitch by mutableStateOf(prefs.voicePitch)
+    var voiceRate by mutableStateOf(prefs.voiceRate)
 
     private val voice = VoiceManager(ctx) { voiceState = it }
     private var ttsNoticeShown = false
@@ -62,6 +64,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun changeLanguage(v: String) { language = v; prefs.language = v; voiceName = null; prefs.voiceName = null }
     fun changeTheme(v: String) { theme = v; prefs.theme = v }
     fun changeTemperature(v: Float) { temperature = v; prefs.temperature = v }
+    fun changeVoicePitch(v: Float) { voicePitch = v; prefs.voicePitch = v }
+    fun changeVoiceRate(v: Float) { voiceRate = v; prefs.voiceRate = v }
     fun setVoice(v: String?) { voiceName = v; prefs.voiceName = v }
     fun changeMemoryEnabled(v: Boolean) { memoryEnabled = v; prefs.memoryEnabled = v }
     fun changeSaveHistory(v: Boolean) { saveHistory = v; prefs.saveHistory = v }
@@ -84,7 +88,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (saveHistory && !error) db.addHistory(false, text)
         if (error) { voiceState = VoiceState.Error; return }
         if (speak) {
-            val ok = voice.speak(text, language, voiceName) { voiceState = VoiceState.Idle }
+            val ok = voice.speak(text, language, voiceName, voicePitch, voiceRate) { voiceState = VoiceState.Idle }
             if (!ok) {
                 voiceState = VoiceState.Idle
                 if (!ttsNoticeShown) {
@@ -194,7 +198,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun speakText(text: String) {
-        val ok = voice.speak(text, language, voiceName) { voiceState = VoiceState.Idle }
+        val ok = voice.speak(text, language, voiceName, voicePitch, voiceRate) { voiceState = VoiceState.Idle }
         if (!ok) { voiceState = VoiceState.Idle; notice = "Is bhasha ki awaaz speech engine mein nahi mili (Settings → Voice)." }
     }
 

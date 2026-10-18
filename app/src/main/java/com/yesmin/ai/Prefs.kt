@@ -88,6 +88,12 @@ class Prefs(ctx: Context) {
     var theme: String
         get() = sp.getString("theme", "system") ?: "system"
         set(v) { sp.edit().putString("theme", v).apply() }
+    var voicePitch: Float
+        get() = sp.getFloat("voice_pitch", 1.0f)
+        set(v) { sp.edit().putFloat("voice_pitch", v).apply() }
+    var voiceRate: Float
+        get() = sp.getFloat("voice_rate", 1.0f)
+        set(v) { sp.edit().putFloat("voice_rate", v).apply() }
     var disclosure: Boolean
         get() = sp.getBoolean("disclosure", false)
         set(v) { sp.edit().putBoolean("disclosure", v).apply() }

@@ -26,6 +26,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -119,6 +120,10 @@ fun SettingsScreen(vm: AppViewModel, nav: NavHostController) {
                 }
             }
             if (voices.isEmpty()) Text("Is bhasha ki koi awaaz nahi mili — voice data install karna padega.", style = MaterialTheme.typography.bodySmall)
+            Text("Awaaz ki unchai (pitch): " + String.format(java.util.Locale.US, "%.1f", vm.voicePitch))
+            Slider(value = vm.voicePitch, onValueChange = { vm.changeVoicePitch(it) }, valueRange = 0.7f..1.5f)
+            Text("Bolne ki raftaar: " + String.format(java.util.Locale.US, "%.1f", vm.voiceRate))
+            Slider(value = vm.voiceRate, onValueChange = { vm.changeVoiceRate(it) }, valueRange = 0.6f..1.4f)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = { vm.speakText("Namaste, main Yesmin hoon. Yeh meri awaaz hai.") }) { Text("Awaaz test") }
                 OutlinedButton(onClick = {

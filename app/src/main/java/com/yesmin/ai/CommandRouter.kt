@@ -44,8 +44,36 @@ object CommandRouter {
         "mein", "me", "karo", "kar", "do", "the", "na", "zara"
     )
 
+
+    private val dev: Map<String, String> = mapOf(
+        "यूट्यूब" to "youtube", "यूटूब" to "youtube", "युट्यूब" to "youtube", "यूट्युब" to "youtube",
+        "खोलो" to "kholo", "खोल" to "kholo", "खोलिए" to "kholo", "खोलें" to "kholo", "खोलना" to "kholo",
+        "चालू" to "chalu", "शुरू" to "start",
+        "गाना" to "gaana", "गाने" to "gaane", "गीत" to "gaana", "संगीत" to "music", "म्यूजिक" to "music", "म्यूज़िक" to "music",
+        "सर्च" to "search", "खोजो" to "search", "ढूंढो" to "search", "ढूँढो" to "search",
+        "चलाओ" to "chalao", "सुनाओ" to "sunao", "प्ले" to "play", "लगाओ" to "lagao", "दिखाओ" to "dikhao",
+        "बैटरी" to "battery", "समय" to "time", "टाइम" to "time", "तारीख" to "date", "डेट" to "date",
+        "इंटरनेट" to "internet", "वाईफाई" to "wifi", "वाइफाई" to "wifi", "नेटवर्क" to "network",
+        "डिवाइस" to "device", "मॉडल" to "model", "मोडल" to "model",
+        "बैक" to "back", "जाओ" to "jao", "पीछे" to "peeche", "होम" to "home", "स्क्रॉल" to "scroll",
+        "नीचे" to "neeche", "ऊपर" to "upar", "टैप" to "tap", "क्लिक" to "click", "दबाओ" to "dabao",
+        "पर" to "par", "पे" to "pe", "में" to "mein", "मे" to "me", "के" to "ke", "का" to "ka", "की" to "ki", "को" to "ko",
+        "मेरा" to "mera", "मेरी" to "meri", "मेरे" to "mere", "करो" to "karo", "कर" to "kar", "दो" to "do",
+        "एक" to "ek", "मुझे" to "mujhe", "भी" to "bhi", "है" to "hai", "हैं" to "hai", "क्या" to "kya",
+        "पसंदीदा" to "favorite", "फेवरेट" to "favorite", "फेवरिट" to "favorite",
+        "व्हाट्सएप" to "whatsapp", "व्हाट्सऐप" to "whatsapp", "वॉट्सऐप" to "whatsapp", "वाट्सऐप" to "whatsapp",
+        "व्हॉट्सएप" to "whatsapp", "वॉट्सएप" to "whatsapp", "व्हाट्सअप" to "whatsapp",
+        "क्रोम" to "chrome", "कैमरा" to "camera", "कैमेरा" to "camera", "सेटिंग" to "settings", "सेटिंग्स" to "settings",
+        "गूगल" to "google", "मैप" to "maps", "मैप्स" to "maps", "जीमेल" to "gmail", "इंस्टाग्राम" to "instagram",
+        "फेसबुक" to "facebook", "टेलीग्राम" to "telegram", "फोन" to "phone", "कैलकुलेटर" to "calculator",
+        "गैलरी" to "gallery", "स्टोर" to "store",
+        "यस्मिन" to "yesmin", "यसमिन" to "yesmin", "येस्मिन" to "yesmin", "यस्मीन" to "yesmin"
+    )
+
+    /** Splits text into words; Devanagari (Hindi script) words are mapped to the same Roman keywords. */
     fun tokens(s: String): List<String> =
         s.lowercase().split(Regex("[^\\p{L}\\p{M}\\p{N}]+")).filter { it.isNotEmpty() }
+            .map { w -> val n = w.replace("\u093C", ""); dev[n] ?: n }
 
     fun isConsequential(label: String): Boolean {
         val l = label.lowercase()

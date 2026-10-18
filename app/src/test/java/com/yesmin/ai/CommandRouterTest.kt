@@ -41,6 +41,14 @@ class CommandRouterTest {
         assertFalse(CommandRouter.isConsequential("Search"))
     }
 
+    @Test fun hindiScript() {
+        assertEquals(Command.OpenApp("youtube"), CommandRouter.parse("यूट्यूब खोलो"))
+        assertEquals(Command.OpenApp("whatsapp"), CommandRouter.parse("व्हाट्सएप खोलो"))
+        assertEquals(Command.YouTube("अरिजीत सिंह songs"), CommandRouter.parse("यूट्यूब पर अरिजीत सिंह के गाने खोलो"))
+        assertEquals(Command.Battery, CommandRouter.parse("बैटरी कितनी है"))
+        assertEquals(Command.Time, CommandRouter.parse("अभी टाइम क्या है"))
+    }
+
     @Test fun normalChatFallsThrough() {
         assertEquals(Command.None, CommandRouter.parse("Mujhe ek kahani sunao"))
         assertEquals(Command.None, CommandRouter.parse("Kotlin mein calculator app ka code likho"))
