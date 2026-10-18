@@ -45,6 +45,8 @@ class CommandRouterTest {
         assertEquals(Command.OpenApp("youtube"), CommandRouter.parse("यूट्यूब खोलो"))
         assertEquals(Command.OpenApp("whatsapp"), CommandRouter.parse("व्हाट्सएप खोलो"))
         assertEquals(Command.YouTube("अरिजीत सिंह songs"), CommandRouter.parse("यूट्यूब पर अरिजीत सिंह के गाने खोलो"))
+        assertEquals(Command.YouTube(""), CommandRouter.parse("मेरे लिए गाना लगा दीजिए"))
+        assertEquals(Command.YouTube(""), CommandRouter.parse("mere liye gaana laga dijiye"))
         assertEquals(Command.Battery, CommandRouter.parse("बैटरी कितनी है"))
         assertEquals(Command.Time, CommandRouter.parse("अभी टाइम क्या है"))
     }

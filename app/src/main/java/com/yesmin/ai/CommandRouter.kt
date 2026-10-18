@@ -34,10 +34,14 @@ object CommandRouter {
         "yesmin", "youtube", "yt", "par", "pe", "mein", "me", "kholo", "khol", "do", "open", "search", "karo",
         "kar", "karna", "ke", "ka", "ki", "ko", "mera", "meri", "mere", "favorite", "favourite", "please", "plz",
         "song", "songs", "gaane", "gana", "gaana", "gane", "music", "sunao", "chalao", "play", "dikhao", "dhundo",
-        "laga", "lagao", "on", "in", "for", "the", "a", "hai", "kya", "mujhe", "ek", "bhi"
+        "laga", "lagao", "on", "in", "for", "the", "a", "hai", "kya", "mujhe", "ek", "bhi",
+        "liye", "dijiye", "dijie", "de", "dena", "bajao", "baja", "chala", "lagaiye", "chalaiye", "sunaiye", "koi", "achha", "accha"
     )
     private val songWords = setOf("song", "songs", "gaane", "gana", "gaana", "gane")
-    private val searchWords = setOf("search", "play", "chalao", "sunao", "dhundo", "dikhao", "laga", "lagao")
+    private val searchWords = setOf(
+        "search", "play", "chalao", "sunao", "dhundo", "dikhao", "laga", "lagao",
+        "bajao", "baja", "chala", "lagaiye", "chalaiye", "sunaiye"
+    )
     private val openWords = setOf("kholo", "khol", "open", "launch", "chalu", "start", "kholna", "खोलो", "खोल")
     private val filler = setOf(
         "yesmin", "please", "plz", "ko", "app", "ek", "mujhe", "mera", "meri", "ka", "ki", "ke", "par", "pe",
@@ -67,6 +71,8 @@ object CommandRouter {
         "गूगल" to "google", "मैप" to "maps", "मैप्स" to "maps", "जीमेल" to "gmail", "इंस्टाग्राम" to "instagram",
         "फेसबुक" to "facebook", "टेलीग्राम" to "telegram", "फोन" to "phone", "कैलकुलेटर" to "calculator",
         "गैलरी" to "gallery", "स्टोर" to "store",
+        "लगा" to "laga", "लगाइए" to "lagaiye", "दीजिए" to "dijiye", "दीजिये" to "dijiye", "लिए" to "liye",
+        "बजाओ" to "bajao", "बजा" to "baja", "चला" to "chala", "चलाइए" to "chalaiye", "सुनाइए" to "sunaiye", "कोई" to "koi", "अच्छा" to "achha",
         "यस्मिन" to "yesmin", "यसमिन" to "yesmin", "येस्मिन" to "yesmin", "यस्मीन" to "yesmin"
     )
 
@@ -109,6 +115,7 @@ object CommandRouter {
             if ("favorite" in t || "favourite" in t) return Command.YouTube("")
             val core = t.filter { it !in stop }
             val extra = if (wantsSongs) listOf("songs") else if (wantsMusic) listOf("music") else emptyList()
+            if (core.isEmpty() && !hasYoutube) return Command.YouTube("")
             val q = (core + extra).joinToString(" ")
             if (q.isNotBlank()) return Command.YouTube(q)
             if (hasYoutube) return Command.OpenApp("youtube")
