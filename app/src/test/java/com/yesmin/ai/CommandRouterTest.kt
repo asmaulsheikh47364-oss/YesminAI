@@ -41,6 +41,13 @@ class CommandRouterTest {
         assertFalse(CommandRouter.isConsequential("Search"))
     }
 
+    @Test fun reminders() {
+        assertEquals(Command.Reminder("chai", 10), CommandRouter.parse("10 minute baad chai ke liye yaad dilao"))
+        assertEquals(Command.Reminder("meeting", 120), CommandRouter.parse("2 ghante baad meeting reminder laga do"))
+        assertEquals(Command.ReminderHelp, CommandRouter.parse("ek reminder lagao"))
+        assertEquals(Command.None, CommandRouter.parse("mujhe kuch yaad nahi aa raha"))
+    }
+
     @Test fun profileNamePrefix() {
         assertEquals(Command.OpenApp("youtube"), CommandRouter.parse("Zara youtube kholo"))
     }

@@ -220,6 +220,10 @@ fun SettingsScreen(vm: AppViewModel, nav: NavHostController) {
                     "• Koi analytics ya chhupa hua data collection nahi.",
                 style = MaterialTheme.typography.bodySmall
             )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Reminder notification mein text chhupao", Modifier.weight(1f))
+                Switch(checked = vm.hideReminderText, onCheckedChange = { vm.changeHideReminderText(it) })
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = { vm.resetDisclosure() }) { Text("Notice dobara dikhao") }
                 OutlinedButton(onClick = { confirmWipe = true }) { Text("Sab kuch delete") }

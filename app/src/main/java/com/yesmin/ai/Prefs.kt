@@ -110,6 +110,9 @@ class Prefs(ctx: Context) {
     var ttsModel: String
         get() = sp.getString("tts_model", "") ?: ""
         set(v) { sp.edit().putString("tts_model", v).apply() }
+    var hideReminderText: Boolean
+        get() = sp.getBoolean("hide_reminder_text", false)
+        set(v) { sp.edit().putBoolean("hide_reminder_text", v).apply() }
     var onboardingDone: Boolean
         get() = sp.getBoolean("onboarding_done", false)
         set(v) { sp.edit().putBoolean("onboarding_done", v).apply() }

@@ -36,6 +36,7 @@ import androidx.navigation.compose.rememberNavController
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        ReminderScheduler.createChannel(this)
         setContent { YesminRoot() }
     }
 }
@@ -97,7 +98,7 @@ fun MainScaffold(vm: AppViewModel) {
         Tab("home", "Home", "🏠"), Tab("chat", "Chat", "💬"), Tab("voice", "Voice", "🎤"),
         Tab("apps", "Apps", "📱"), Tab("more", "More", "☰")
     )
-    val moreRoutes = setOf("more", "brain", "tools", "settings", "memory", "calc", "device", "support", "profiles")
+    val moreRoutes = setOf("more", "brain", "tools", "settings", "memory", "calc", "device", "support", "profiles", "reminders")
     Scaffold(
         snackbarHost = { SnackbarHost(snack) },
         bottomBar = {
@@ -119,7 +120,7 @@ fun MainScaffold(vm: AppViewModel) {
             composable("home") { HomeScreen(vm, nav) }
             composable("chat") { ChatScreen(vm) }
             composable("voice") { VoiceScreen(vm) }
-            composable("apps") { AppsScreen(vm) }
+            composable("apps") { AppsScreen(vm, nav) }
             composable("more") { MoreScreen(nav) }
             composable("brain") { BrainScreen(vm) }
             composable("tools") { ToolsScreen(vm, nav) }
@@ -130,6 +131,7 @@ fun MainScaffold(vm: AppViewModel) {
             composable("device") { DeviceScreen() }
             composable("support") { SupportScreen() }
             composable("profiles") { ProfilesScreen(vm) }
+            composable("reminders") { RemindersScreen(vm) }
         }
     }
 }

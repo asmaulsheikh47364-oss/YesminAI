@@ -6,6 +6,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.delay
@@ -55,6 +56,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var customTone by mutableStateOf(prefs.customTone)
     var voiceEngine by mutableStateOf(prefs.voiceEngine)
     var ttsModelName by mutableStateOf(prefs.ttsModel)
+    var reminders by mutableStateOf(listOf<Reminder>())
+    var hideReminderText by mutableStateOf(prefs.hideReminderText)
 
     private val voice = VoiceManager(ctx, { voiceState = it }, { micLevel = it })
     private var ttsNoticeShown = false
@@ -62,6 +65,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         refreshMemories()
+        refreshReminders()
         if (prefs.saveHistory) messages.addAll(db.history(50))
     }
 
@@ -208,6 +212,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             Command.Time -> reply(PhoneInfo.time(), speak)
             Command.Network -> reply(PhoneInfo.network(ctx), speak)
             Command.DeviceInfo -> reply(PhoneInfo.device(), speak)
+            is Command.Reminder -> createQuickReminder(cmd.title, cmd.minutes, speak)
+            Command.ReminderHelp -> reply("Reminder ke liye bolo: '10 minute baad chai ke liye yaad dilao', ya More mein Reminders kholo.", speak)
             is Command.Calc -> {
                 val v = Calculator.eval(cmd.expr)
                 reply(if (v == null) "Yeh hisaab main samajh nahi paayi." else "${cmd.expr.trim()} = ${Calculator.format(v)}", speak)
@@ -371,6 +377,73 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // ---------- reminders ----------
+    fun refreshReminders() { reminders = db.reminders() }
+
+    fun changeHideReminderText(v: Boolean) { hideReminderText = v; prefs.hideReminderText = v }
+
+    private fun createQuickReminder(title: String, minutes: Int, speak: Boolean) {
+        val mins = minutes.coerceIn(1, 60 * 24 * 30)
+        val time = System.currentTimeMillis() + mins * 60_000L
+        val id = db.addReminder(title, "", time, "none")
+        if (id < 0) { reply("Reminder save nahi ho paya.", false, true); return }
+        ReminderScheduler.schedule(ctx, Reminder(id, title, "", time, "none", false))
+        refreshReminders()
+        val at = java.text.SimpleDateFormat("hh:mm a", java.util.Locale.getDefault()).format(time)
+        var msg = "Theek hai, $mins minute baad ($at) '$title' yaad dilaungi."
+        if (!NotificationManagerCompat.from(ctx).areNotificationsEnabled()) {
+            msg += " Par Notifications band hain, isliye alert dikhega nahi — More → Reminders mein allow karo."
+        } else if (!ReminderScheduler.canExact(ctx)) {
+            msg += " Exact alarm ki ijazat nahi hai, isliye thodi der ho sakti hai."
+        }
+        reply(msg, speak)
+    }
+
+    fun saveReminder(id: Long?, title: String, note: String, time: Long, repeat: String): Boolean {
+        val t = title.trim()
+        if (t.isEmpty()) { notice = "Pehle likho ki kya yaad dilana hai."; return false }
+        if (time <= System.currentTimeMillis() && repeat == "none") { notice = "Aage ka time chuno."; return false }
+        val n = note.trim()
+        if (id == null) {
+            val nid = db.addReminder(t, n, time, repeat)
+            if (nid < 0) { notice = "Reminder save nahi ho paya."; return false }
+            ReminderScheduler.schedule(ctx, Reminder(nid, t, n, time, repeat, false))
+        } else {
+            ReminderScheduler.cancel(ctx, id)
+            if (!db.updateReminder(id, t, n, time, repeat)) { notice = "Update nahi ho paya."; return false }
+            ReminderScheduler.schedule(ctx, Reminder(id, t, n, time, repeat, false))
+        }
+        refreshReminders()
+        notice = if (ReminderScheduler.canExact(ctx)) "Reminder lag gaya." else "Reminder laga (exact alarm ki ijazat nahi, thodi der ho sakti hai)."
+        return true
+    }
+
+    fun completeReminder(id: Long) {
+        db.setReminderDone(id, true)
+        ReminderScheduler.cancel(ctx, id)
+        refreshReminders()
+    }
+
+    fun snoozeReminder(id: Long) {
+        val r = db.reminder(id) ?: return
+        val nt = System.currentTimeMillis() + 10 * 60_000L
+        if (r.repeat == "none") {
+            db.updateReminderTime(id, nt)
+            db.setReminderDone(id, false)
+            ReminderScheduler.schedule(ctx, r.copy(timeMillis = nt, done = false))
+        } else {
+            ReminderScheduler.scheduleOnce(ctx, id, nt)
+        }
+        refreshReminders()
+        notice = "10 minute baad dobara yaad dilaungi."
+    }
+
+    fun deleteReminder(id: Long) {
+        ReminderScheduler.cancel(ctx, id)
+        db.deleteReminder(id)
+        refreshReminders()
+    }
+
     // ---------- memory ----------
     fun refreshMemories() { memories = db.all() }
 
@@ -398,6 +471,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun clearHistory() { db.clearHistory(); notice = "Saved history delete ho gayi." }
 
     fun wipeAll() {
+        db.reminders().forEach { ReminderScheduler.cancel(ctx, it.id) }
+        db.clearReminders()
+        refreshReminders()
         prefs.clearApiKey()
         db.clearMemory()
         db.clearHistory()

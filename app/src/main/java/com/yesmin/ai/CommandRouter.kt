@@ -15,6 +15,9 @@ sealed class Command {
     data class YouTube(val query: String) : Command()
     data class Calc(val expr: String) : Command()
     data class A11y(val action: A11yAction) : Command()
+    /** "10 minute baad ..." style quick reminder. */
+    data class Reminder(val title: String, val minutes: Int) : Command()
+    object ReminderHelp : Command()
     object Battery : Command()
     object Time : Command()
     object Network : Command()
@@ -73,6 +76,8 @@ object CommandRouter {
         "गैलरी" to "gallery", "स्टोर" to "store",
         "लगा" to "laga", "लगाइए" to "lagaiye", "दीजिए" to "dijiye", "दीजिये" to "dijiye", "लिए" to "liye",
         "बजाओ" to "bajao", "बजा" to "baja", "चला" to "chala", "चलाइए" to "chalaiye", "सुनाइए" to "sunaiye", "कोई" to "koi", "अच्छा" to "achha",
+        "मिनट" to "minute", "घंटे" to "ghante", "घंटा" to "ghanta", "रिमाइंडर" to "reminder", "याद" to "yaad",
+        "दिलाओ" to "dilao", "दिलाना" to "dilana", "बाद" to "baad", "अलार्म" to "alarm", "सेट" to "set",
         "यस्मिन" to "yesmin", "यसमिन" to "yesmin", "येस्मिन" to "yesmin", "यस्मीन" to "yesmin"
     )
 
@@ -99,6 +104,31 @@ object CommandRouter {
         calcRe.matchEntire(text)?.let { m ->
             val e = m.groupValues[1].trim()
             if (e.any { it.isDigit() } && e.any { it in "+-*/x×÷%" }) return Command.Calc(e)
+        }
+
+        val hasReminderNoun = t.any { it in setOf("reminder", "remind", "alarm") }
+        val hasYaadDila = "yaad" in t && t.any { it in setOf("dilao", "dilana", "dila", "dilaiye", "dilado", "dijiye") }
+        if ((hasReminderNoun || hasYaadDila) && t.size <= 14) {
+            var minutes = 0
+            var idx = -1
+            for (i in 0 until t.size - 1) {
+                val n = t[i].toIntOrNull()
+                if (n != null) {
+                    val unit = t[i + 1]
+                    if (unit in setOf("minute", "minutes", "min", "mins")) { minutes = n; idx = i; break }
+                    if (unit in setOf("ghante", "ghanta", "hour", "hours", "hr", "hrs")) { minutes = n * 60; idx = i; break }
+                }
+            }
+            if (minutes > 0) {
+                val skip = setOf(
+                    "baad", "mein", "me", "ke", "ka", "ki", "liye", "yaad", "dilao", "dilana", "dila", "dilaiye", "dilado", "dijiye",
+                    "reminder", "remind", "set", "karo", "kar", "laga", "lagao", "mujhe", "mere", "meri", "ek", "after", "in", "to",
+                    "alarm", "bhi", "hai", "please", "plz", "aur", "me", "do", "dena", "de"
+                )
+                val title = t.filterIndexed { i, w -> i != idx && i != idx + 1 && w !in skip && w.toIntOrNull() == null }.joinToString(" ")
+                return Command.Reminder(title.ifBlank { "Reminder" }, minutes)
+            }
+            return Command.ReminderHelp
         }
 
         if (t.size <= 7) {
