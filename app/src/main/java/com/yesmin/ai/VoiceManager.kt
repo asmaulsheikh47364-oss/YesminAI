@@ -12,7 +12,11 @@ import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import java.util.Locale
 
-class VoiceManager(private val ctx: Context, private val onState: (VoiceState) -> Unit) {
+class VoiceManager(
+    private val ctx: Context,
+    private val onState: (VoiceState) -> Unit,
+    private val onLevel: (Float) -> Unit
+) {
     private val main = Handler(Looper.getMainLooper())
     private var recognizer: SpeechRecognizer? = null
     private var tts: TextToSpeech? = null
@@ -37,7 +41,7 @@ class VoiceManager(private val ctx: Context, private val onState: (VoiceState) -
         r.setRecognitionListener(object : RecognitionListener {
             override fun onReadyForSpeech(params: Bundle?) {}
             override fun onBeginningOfSpeech() {}
-            override fun onRmsChanged(rmsdB: Float) {}
+            override fun onRmsChanged(rmsdB: Float) { onLevel(((rmsdB + 2f) / 12f).coerceIn(0f, 1f)) }
             override fun onBufferReceived(buffer: ByteArray?) {}
             override fun onEndOfSpeech() {}
             override fun onPartialResults(partialResults: Bundle?) {}
@@ -68,6 +72,7 @@ class VoiceManager(private val ctx: Context, private val onState: (VoiceState) -
         try { recognizer?.cancel() } catch (e: Exception) {}
         try { recognizer?.destroy() } catch (e: Exception) {}
         recognizer = null
+        onLevel(0f)
     }
 
     private fun errorText(code: Int): String = when (code) {

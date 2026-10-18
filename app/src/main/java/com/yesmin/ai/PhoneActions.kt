@@ -101,4 +101,24 @@ object PhoneInfo {
         "Abhi " + SimpleDateFormat("EEEE, d MMMM yyyy, hh:mm a", Locale.getDefault()).format(Date()) + " hai."
 
     fun device(): String = "Device: ${Build.MANUFACTURER} ${Build.MODEL}, Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})."
+
+    private fun gb(b: Long): String = String.format(Locale.US, "%.1f GB", b / 1073741824.0)
+
+    fun storage(): String = try {
+        val s = android.os.StatFs(android.os.Environment.getDataDirectory().path)
+        "Storage: ${gb(s.totalBytes - s.availableBytes)} used / ${gb(s.totalBytes)} total (${gb(s.availableBytes)} khaali)"
+    } catch (e: Exception) {
+        "Storage ki jaankari nahi mili."
+    }
+
+    fun ram(ctx: Context): String = try {
+        val am = ctx.getSystemService(android.app.ActivityManager::class.java)
+        val mi = android.app.ActivityManager.MemoryInfo()
+        am.getMemoryInfo(mi)
+        "RAM: ${gb(mi.totalMem - mi.availMem)} used / ${gb(mi.totalMem)} total"
+    } catch (e: Exception) {
+        "RAM ki jaankari nahi mili."
+    }
+
+    fun cpu(): String = "CPU: ${Runtime.getRuntime().availableProcessors()} cores (${Build.SUPPORTED_ABIS.firstOrNull() ?: "?"})"
 }

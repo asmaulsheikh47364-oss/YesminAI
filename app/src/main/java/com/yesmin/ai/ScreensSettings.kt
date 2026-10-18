@@ -25,6 +25,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
@@ -87,6 +88,14 @@ fun SettingsScreen(vm: AppViewModel, nav: NavHostController) {
         Section("Gemini API & Model") {
             Text("Provider: Google Gemini · model: ${vm.model} · key: " + if (vm.hasKey) "saved" else "nahi")
             OutlinedButton(onClick = { nav.navigate("brain") }) { Text("AI Brain kholo") }
+        }
+
+        Section("Profile") {
+            var nm by remember { mutableStateOf(vm.userName) }
+            OutlinedTextField(
+                value = nm, onValueChange = { nm = it; vm.changeUserName(it) }, singleLine = true,
+                label = { Text("Aapka naam") }, modifier = Modifier.fillMaxWidth()
+            )
         }
 
         Section("Language") {

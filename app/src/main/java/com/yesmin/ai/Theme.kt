@@ -4,24 +4,33 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 
+val NeonCyan = Color(0xFF22D3EE)
+val NeonViolet = Color(0xFF8B5CF6)
+val NeonPink = Color(0xFFF472B6)
+val NeonBrush = Brush.linearGradient(listOf(NeonCyan, NeonViolet))
+
 private val DarkColors = darkColorScheme(
-    primary = Color(0xFFB69DFF), onPrimary = Color(0xFF2B0A6B),
-    primaryContainer = Color(0xFF3F2A7A), onPrimaryContainer = Color(0xFFE9DDFF),
-    secondary = Color(0xFF82B1FF), tertiary = Color(0xFFFF9EC7),
-    background = Color(0xFF12101A), onBackground = Color(0xFFE8E2F2),
-    surface = Color(0xFF1C1826), onSurface = Color(0xFFE8E2F2),
-    surfaceVariant = Color(0xFF2A2538), onSurfaceVariant = Color(0xFFCFC8DC)
+    primary = NeonCyan, onPrimary = Color(0xFF00212A),
+    primaryContainer = Color(0xFF1B2A5C), onPrimaryContainer = Color(0xFFD6E4FF),
+    secondary = NeonViolet, onSecondary = Color.White,
+    tertiary = NeonPink,
+    background = Color(0xFF070B1A), onBackground = Color(0xFFE6ECFF),
+    surface = Color(0xFF0F1630), onSurface = Color(0xFFE6ECFF),
+    surfaceVariant = Color(0xFF172044), onSurfaceVariant = Color(0xFFB8C4E6),
+    errorContainer = Color(0xFF7A1F1F), onErrorContainer = Color(0xFFFFDAD6)
 )
 
 private val LightColors = lightColorScheme(
-    primary = Color(0xFF6A3DE8), onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFFE9DDFF), onPrimaryContainer = Color(0xFF22005D),
-    secondary = Color(0xFF2962FF), tertiary = Color(0xFFD81B76),
-    background = Color(0xFFFAF8FF), onBackground = Color(0xFF1C1B22),
-    surface = Color(0xFFFFFFFF), onSurface = Color(0xFF1C1B22),
-    surfaceVariant = Color(0xFFEDE7FA), onSurfaceVariant = Color(0xFF49454F)
+    primary = Color(0xFF0891B2), onPrimary = Color(0xFFFFFFFF),
+    primaryContainer = Color(0xFFD6F3FA), onPrimaryContainer = Color(0xFF00313B),
+    secondary = Color(0xFF7C3AED), onSecondary = Color.White,
+    tertiary = Color(0xFFDB2777),
+    background = Color(0xFFF4F7FF), onBackground = Color(0xFF111827),
+    surface = Color(0xFFFFFFFF), onSurface = Color(0xFF111827),
+    surfaceVariant = Color(0xFFE6ECFF), onSurfaceVariant = Color(0xFF43506B)
 )
 
 @Composable

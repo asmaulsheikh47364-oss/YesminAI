@@ -47,8 +47,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var disclosure by mutableStateOf(prefs.disclosure)
     var voicePitch by mutableStateOf(prefs.voicePitch)
     var voiceRate by mutableStateOf(prefs.voiceRate)
+    var micLevel by mutableStateOf(0f)
+    var onboardingDone by mutableStateOf(prefs.onboardingDone)
+    var userName by mutableStateOf(prefs.userName)
 
-    private val voice = VoiceManager(ctx) { voiceState = it }
+    private val voice = VoiceManager(ctx, { voiceState = it }, { micLevel = it })
     private var ttsNoticeShown = false
 
     init {
@@ -66,6 +69,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun changeTemperature(v: Float) { temperature = v; prefs.temperature = v }
     fun changeVoicePitch(v: Float) { voicePitch = v; prefs.voicePitch = v }
     fun changeVoiceRate(v: Float) { voiceRate = v; prefs.voiceRate = v }
+    fun changeUserName(v: String) { userName = v.trim(); prefs.userName = userName }
+    fun finishOnboarding(name: String) {
+        changeUserName(name)
+        onboardingDone = true
+        prefs.onboardingDone = true
+    }
+    fun openApp(name: String) { if (name.isNotBlank()) handleCommand(Command.OpenApp(name.trim()), false) }
+    fun openYouTubeSearch(q: String) { if (q.isNotBlank()) handleCommand(Command.YouTube(q.trim()), false) }
     fun setVoice(v: String?) { voiceName = v; prefs.voiceName = v }
     fun changeMemoryEnabled(v: Boolean) { memoryEnabled = v; prefs.memoryEnabled = v }
     fun changeSaveHistory(v: Boolean) { saveHistory = v; prefs.saveHistory = v }

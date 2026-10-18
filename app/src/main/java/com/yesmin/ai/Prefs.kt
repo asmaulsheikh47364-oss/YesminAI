@@ -86,7 +86,7 @@ class Prefs(ctx: Context) {
         set(v) { sp.edit().putFloat("temperature", v).apply() }
     /** system | dark | light */
     var theme: String
-        get() = sp.getString("theme", "system") ?: "system"
+        get() = sp.getString("theme", "dark") ?: "dark"
         set(v) { sp.edit().putString("theme", v).apply() }
     var voicePitch: Float
         get() = sp.getFloat("voice_pitch", 1.0f)
@@ -94,6 +94,12 @@ class Prefs(ctx: Context) {
     var voiceRate: Float
         get() = sp.getFloat("voice_rate", 1.0f)
         set(v) { sp.edit().putFloat("voice_rate", v).apply() }
+    var onboardingDone: Boolean
+        get() = sp.getBoolean("onboarding_done", false)
+        set(v) { sp.edit().putBoolean("onboarding_done", v).apply() }
+    var userName: String
+        get() = sp.getString("user_name", "") ?: ""
+        set(v) { sp.edit().putString("user_name", v).apply() }
     var disclosure: Boolean
         get() = sp.getBoolean("disclosure", false)
         set(v) { sp.edit().putBoolean("disclosure", v).apply() }
