@@ -91,7 +91,7 @@ object CommandRouter {
         val text = input.trim()
         if (text.isEmpty()) return Command.None
         var t = tokens(text)
-        if (t.firstOrNull() == "yesmin") t = t.drop(1)
+        if (t.firstOrNull() in setOf("yesmin", "zara", "riya", "aisha")) t = t.drop(1)
         if (t.isEmpty()) return Command.None
 
         a11y(text, t)?.let { return Command.A11y(it) }

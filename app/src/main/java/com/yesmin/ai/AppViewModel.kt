@@ -50,16 +50,22 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var micLevel by mutableStateOf(0f)
     var onboardingDone by mutableStateOf(prefs.onboardingDone)
     var userName by mutableStateOf(prefs.userName)
+    var profileId by mutableStateOf(prefs.profileId)
+    var customName by mutableStateOf(prefs.customName)
+    var customTone by mutableStateOf(prefs.customTone)
+    var voiceEngine by mutableStateOf(prefs.voiceEngine)
+    var ttsModelName by mutableStateOf(prefs.ttsModel)
 
     private val voice = VoiceManager(ctx, { voiceState = it }, { micLevel = it })
     private var ttsNoticeShown = false
+    private val pcm = PcmPlayer()
 
     init {
         refreshMemories()
         if (prefs.saveHistory) messages.addAll(db.history(50))
     }
 
-    override fun onCleared() { voice.shutdown() }
+    override fun onCleared() { voice.shutdown(); pcm.stop() }
 
     // ---------- settings ----------
     fun setModelName(v: String) { model = v.trim(); prefs.model = model }
@@ -91,6 +97,75 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         VoiceState.Error -> "Error — details chat mein"
     }
 
+    // ---------- personalities & speaking ----------
+    fun activeProfile(): Profile =
+        if (profileId == "custom") {
+            val n = customName.ifBlank { "Custom" }
+            Profile("custom", n, "Custom", customTone.ifBlank { "friendly and helpful" }, n.take(1).uppercase(), NeonPink, NeonViolet, 1.0f, 1.0f, "Kore")
+        } else {
+            Profiles.byId(profileId) ?: Profiles.all[0]
+        }
+
+    fun changeProfile(id: String) {
+        profileId = id
+        prefs.profileId = id
+        val p = activeProfile()
+        changeVoicePitch(p.pitch)
+        changeVoiceRate(p.rate)
+    }
+
+    fun saveCustom(name: String, tone: String) {
+        customName = name.trim().take(20)
+        customTone = tone.trim().take(200)
+        prefs.customName = customName
+        prefs.customTone = customTone
+        changeProfile("custom")
+    }
+
+    fun changeVoiceEngine(v: String) { voiceEngine = v; prefs.voiceEngine = v }
+    fun changeTtsModel(v: String) { ttsModelName = v; prefs.ttsModel = v }
+
+    private fun ttsModel(): String = ttsModelName.ifBlank {
+        models.firstOrNull { it.contains("tts") && !it.contains("lite") }
+            ?: models.firstOrNull { it.contains("tts") }
+            ?: "gemini-2.5-flash-preview-tts"
+    }
+
+    fun previewProfile(p: Profile) {
+        speakWith("Namaste, main " + p.name + " hoon. " + p.tag + " — aapki madad ke liye taiyaar.", p, true)
+    }
+
+    private fun speakWith(text: String, p: Profile = activeProfile(), previewing: Boolean = false) {
+        val key = prefs.apiKey
+        if (voiceEngine == "gemini" && key != null && disclosure) {
+            voiceState = VoiceState.Thinking
+            viewModelScope.launch {
+                val r = gemini.speech(key, ttsModel(), p.geminiVoice, voice.speakable(text).take(1200))
+                val audio = r.audio
+                if (r.ok && audio != null) {
+                    voiceState = VoiceState.Speaking
+                    pcm.play(audio) { voiceState = VoiceState.Idle }
+                } else {
+                    notice = "Gemini awaaz nahi mili (" + r.text.take(80) + ") — phone ki awaaz se bol rahi hoon."
+                    phoneSpeak(text, if (previewing) p.pitch else voicePitch, if (previewing) p.rate else voiceRate)
+                }
+            }
+        } else {
+            phoneSpeak(text, if (previewing) p.pitch else voicePitch, if (previewing) p.rate else voiceRate)
+        }
+    }
+
+    private fun phoneSpeak(text: String, pitch: Float, rate: Float) {
+        val ok = voice.speak(text, language, voiceName, pitch, rate) { voiceState = VoiceState.Idle }
+        if (!ok) {
+            voiceState = VoiceState.Idle
+            if (!ttsNoticeShown) {
+                ttsNoticeShown = true
+                messages.add(ChatMsg(false, "Is phone ke speech engine mein is bhasha ki awaaz nahi mili, isliye main bol nahi paa rahi. Settings → Voice se voice data install karo. Tab tak text mein jawab dungi.", true))
+            }
+        }
+    }
+
     // ---------- chat ----------
     private fun localeTag() = if (language == "english") "en-IN" else "hi-IN"
 
@@ -98,18 +173,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         messages.add(ChatMsg(false, text, error))
         if (saveHistory && !error) db.addHistory(false, text)
         if (error) { voiceState = VoiceState.Error; return }
-        if (speak) {
-            val ok = voice.speak(text, language, voiceName, voicePitch, voiceRate) { voiceState = VoiceState.Idle }
-            if (!ok) {
-                voiceState = VoiceState.Idle
-                if (!ttsNoticeShown) {
-                    ttsNoticeShown = true
-                    messages.add(ChatMsg(false, "Is phone ke speech engine mein is bhasha ki awaaz nahi mili, isliye main bol nahi paa rahi. Settings → Voice se voice data install karo. Tab tak text mein jawab dungi.", true))
-                }
-            }
-        } else {
-            voiceState = VoiceState.Idle
-        }
+        if (speak) speakWith(text) else voiceState = VoiceState.Idle
     }
 
     fun send(text: String, speak: Boolean) {
@@ -202,22 +266,20 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             .dropWhile { it.first != "user" }
         val mem = if (memoryEnabled) memories.filter { it.category != "snippet" }.take(30).map { it.text } else emptyList()
         viewModelScope.launch {
-            val r = gemini.generate(key, model, Personas.chatSystem(persona, language, mem), hist, temperature)
+            val r = gemini.generate(key, model, Personas.chatSystem(persona, language, mem, activeProfile().name, activeProfile().tone), hist, temperature)
             busy = false
             if (r.ok) reply(r.text, speak) else reply(r.text, false, true)
         }
     }
 
-    fun speakText(text: String) {
-        val ok = voice.speak(text, language, voiceName, voicePitch, voiceRate) { voiceState = VoiceState.Idle }
-        if (!ok) { voiceState = VoiceState.Idle; notice = "Is bhasha ki awaaz speech engine mein nahi mili (Settings → Voice)." }
-    }
+    fun speakText(text: String) { speakWith(text) }
 
-    fun stopSpeaking() { voice.stopSpeaking(); voiceState = VoiceState.Idle }
+    fun stopSpeaking() { voice.stopSpeaking(); pcm.stop(); voiceState = VoiceState.Idle }
 
     fun startListening() {
         if (voiceState == VoiceState.Listening) { cancelListening(); return }
         if (busy) return
+        pcm.stop()
         voice.listen(localeTag(),
             onText = { voiceState = VoiceState.Idle; send(it, true) },
             onFail = { msg -> messages.add(ChatMsg(false, msg, true)); voiceState = VoiceState.Error })
@@ -290,7 +352,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         busy = true
         sampleReply = ""
         viewModelScope.launch {
-            val r = gemini.generate(key, model, Personas.chatSystem(persona, language, emptyList()), listOf("user" to msg), temperature)
+            val r = gemini.generate(key, model, Personas.chatSystem(persona, language, emptyList(), activeProfile().name, activeProfile().tone), listOf("user" to msg), temperature)
             sampleReply = r.text
             busy = false
         }

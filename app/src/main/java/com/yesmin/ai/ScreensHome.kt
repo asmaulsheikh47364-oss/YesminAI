@@ -147,7 +147,8 @@ fun HomeScreen(vm: AppViewModel, nav: NavHostController) {
         Triple("💬", "Chat", "chat"), Triple("🎤", "Voice", "voice"),
         Triple("📱", "Apps & Phone", "apps"), Triple("🧠", "AI Brain", "brain"),
         Triple("🗂", "Memory", "memory"), Triple("🛠", "AI Tools", "tools"),
-        Triple("📊", "Device Info", "device"), Triple("⚙️", "Settings", "settings")
+        Triple("📊", "Device Info", "device"), Triple("⚙️", "Settings", "settings"),
+        Triple("🎭", "Personalities", "profiles"), Triple("🛟", "Help", "support")
     )
     val quick = listOf(
         "▶ YouTube music" to "youtube par music kholo",
@@ -162,9 +163,9 @@ fun HomeScreen(vm: AppViewModel, nav: NavHostController) {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text("Yesmin AI", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-        NeonAvatar(130.dp)
+        NeonAvatar(130.dp, vm.activeProfile().letter, vm.activeProfile().c1, vm.activeProfile().c2)
         Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-        Text("Main Yesmin hoon, aapki personal AI assistant. Aaj main kaise madad karoon?", style = MaterialTheme.typography.bodyMedium)
+        Text("Main " + vm.activeProfile().name + " hoon, aapki personal AI assistant. Aaj main kaise madad karoon?", style = MaterialTheme.typography.bodyMedium)
         Text(
             "● " + vm.statusLabel() + "   ·   Gemini: " + when (vm.brainStatus) {
                 BrainStatus.Connected -> "Connected"

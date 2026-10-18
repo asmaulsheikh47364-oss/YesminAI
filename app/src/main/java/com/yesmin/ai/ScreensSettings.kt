@@ -107,7 +107,7 @@ fun SettingsScreen(vm: AppViewModel, nav: NavHostController) {
             Text("Bolne ki bhasha (speech recognition) bhi isi se set hoti hai.", style = MaterialTheme.typography.bodySmall)
         }
 
-        Section("Personality") {
+        Section("Mode (jawab ka andaaz)") {
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Personas.names.forEach { n -> FilterChip(selected = vm.persona == n, onClick = { vm.changePersona(n) }, label = { Text(n) }) }
             }
@@ -118,6 +118,22 @@ fun SettingsScreen(vm: AppViewModel, nav: NavHostController) {
                 "Awaaz aapke phone ke Text-to-Speech engine par nirbhar hai. Female voice har phone par nahi hoti.",
                 style = MaterialTheme.typography.bodySmall
             )
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                FilterChip(selected = vm.voiceEngine == "phone", onClick = { vm.changeVoiceEngine("phone") }, label = { Text("Phone voice") })
+                FilterChip(selected = vm.voiceEngine == "gemini", onClick = { vm.changeVoiceEngine("gemini") }, label = { Text("Gemini voice (natural)") })
+            }
+            if (vm.voiceEngine == "gemini") {
+                Text(
+                    "Gemini awaaz internet aur key use karti hai (quota lagta hai). Na chale to phone ki awaaz se bol degi. Har personality ki apni awaaz hai.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                vm.models.filter { it.contains("tts") }.take(6).forEach { m ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(selected = vm.ttsModelName == m, onClick = { vm.changeTtsModel(m) })
+                        Text(m)
+                    }
+                }
+            }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 RadioButton(selected = vm.voiceName == null, onClick = { vm.setVoice(null) })
                 Text("Engine ki default awaaz")

@@ -47,6 +47,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -58,13 +60,13 @@ import androidx.navigation.NavHostController
 // ---------- shared pieces ----------
 
 @Composable
-fun NeonAvatar(size: Dp) {
-    Box(Modifier.size(size).clip(CircleShape).background(NeonBrush), contentAlignment = Alignment.Center) {
+fun NeonAvatar(size: Dp, letter: String = "Y", c1: Color = NeonCyan, c2: Color = NeonViolet) {
+    Box(Modifier.size(size).clip(CircleShape).background(Brush.linearGradient(listOf(c1, c2))), contentAlignment = Alignment.Center) {
         Box(
             Modifier.size(size - 10.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surface),
             contentAlignment = Alignment.Center
         ) {
-            Text("Y", fontSize = (size.value * 0.45f).sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            Text(letter, fontSize = (size.value * 0.45f).sp, fontWeight = FontWeight.Bold, color = c1)
         }
     }
 }
@@ -128,7 +130,7 @@ fun VoiceScreen(vm: AppViewModel) {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text("Voice", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-        NeonAvatar(110.dp)
+        NeonAvatar(110.dp, vm.activeProfile().letter, vm.activeProfile().c1, vm.activeProfile().c2)
         Text(vm.statusLabel(), style = MaterialTheme.typography.titleMedium)
         Waveform(level)
         Box(
@@ -232,6 +234,7 @@ fun MoreScreen(nav: NavHostController) {
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Text("More", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        NavRow("🎭", "AI Personalities", "Yesmin, Zara, Riya, Aisha ya apni khud ki") { nav.navigate("profiles") { launchSingleTop = true } }
         NavRow("🧠", "AI Brain", "Gemini key, model, connection test") { nav.navigate("brain") { launchSingleTop = true } }
         NavRow("🛠", "AI Tools", "Code, translate, writing, study, ideas") { nav.navigate("tools") { launchSingleTop = true } }
         NavRow("🗂", "Memory", "Notes, tasks aur pasand — edit/delete karo") { nav.navigate("memory") { launchSingleTop = true } }

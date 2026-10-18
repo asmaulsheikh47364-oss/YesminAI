@@ -41,6 +41,10 @@ class CommandRouterTest {
         assertFalse(CommandRouter.isConsequential("Search"))
     }
 
+    @Test fun profileNamePrefix() {
+        assertEquals(Command.OpenApp("youtube"), CommandRouter.parse("Zara youtube kholo"))
+    }
+
     @Test fun hindiScript() {
         assertEquals(Command.OpenApp("youtube"), CommandRouter.parse("यूट्यूब खोलो"))
         assertEquals(Command.OpenApp("whatsapp"), CommandRouter.parse("व्हाट्सएप खोलो"))

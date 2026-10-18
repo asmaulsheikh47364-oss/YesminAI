@@ -10,7 +10,7 @@ import java.net.SocketTimeoutException
 import java.net.URL
 import java.net.UnknownHostException
 
-data class AiResult(val ok: Boolean, val text: String, val models: List<String> = emptyList())
+data class AiResult(val ok: Boolean, val text: String, val models: List<String> = emptyList(), val audio: ByteArray? = null)
 
 /** Talks to the official Gemini REST API (v1beta). The API key is sent only in a header, never logged. */
 class GeminiClient {
@@ -82,6 +82,42 @@ class GeminiClient {
         }
     }
 
+    /** Gemini text-to-speech: returns raw 16-bit mono PCM at 24 kHz in AiResult.audio. */
+    suspend fun speech(key: String, model: String, voiceName: String, text: String): AiResult = withContext(Dispatchers.IO) {
+        try {
+            val m = model.trim()
+            if (!Regex("[A-Za-z0-9._-]+").matches(m)) return@withContext AiResult(false, "TTS model ka naam galat hai.")
+            val voiceCfg = JSONObject().put("prebuiltVoiceConfig", JSONObject().put("voiceName", voiceName))
+            val gen = JSONObject()
+                .put("responseModalities", JSONArray().put("AUDIO"))
+                .put("speechConfig", JSONObject().put("voiceConfig", voiceCfg))
+            val body = JSONObject()
+                .put("contents", JSONArray().put(JSONObject().put("parts", JSONArray().put(JSONObject().put("text", text)))))
+                .put("generationConfig", gen)
+            var r = request("POST", "$base/models/$m:generateContent", key, body.toString())
+            var tries = 0
+            while ((r.first == 503 || r.first == 500) && tries < 2) {
+                tries++
+                delay(2000L * tries)
+                r = request("POST", "$base/models/$m:generateContent", key, body.toString())
+            }
+            if (r.first != 200) return@withContext AiResult(false, friendly(r.first, r.second, m))
+            val parts = JSONObject(r.second).optJSONArray("candidates")?.optJSONObject(0)
+                ?.optJSONObject("content")?.optJSONArray("parts")
+            var data: String? = null
+            if (parts != null) {
+                for (i in 0 until parts.length()) {
+                    val d = parts.getJSONObject(i).optJSONObject("inlineData")?.optString("data")
+                    if (!d.isNullOrEmpty()) data = d
+                }
+            }
+            if (data == null) return@withContext AiResult(false, "Awaaz ka data nahi aaya.")
+            AiResult(true, "ok", audio = android.util.Base64.decode(data, android.util.Base64.DEFAULT))
+        } catch (e: Exception) {
+            AiResult(false, netError(e))
+        }
+    }
+
     private fun request(method: String, url: String, key: String, body: String?): Pair<Int, String> {
         val c = URL(url).openConnection() as HttpURLConnection
         try {
@@ -139,10 +175,11 @@ object Personas {
         else -> "Style: warm, caring, playful friend. Keep it natural and not repetitive."
     }
 
-    fun chatSystem(persona: String, language: String, memories: List<String>): String {
+    fun chatSystem(persona: String, language: String, memories: List<String>, assistantName: String, tone: String): String {
         val mem = if (memories.isEmpty()) "" else "\nUser-approved saved notes (use only when relevant):\n" +
             memories.joinToString("\n") { "- " + it.take(200) }
-        return "You are Yesmin, a female AI assistant inside the Yesmin AI Android app. " +
+        return "You are $assistantName, a female AI assistant inside the Yesmin AI Android app. " +
+            "Character style (only changes how you speak; it never overrides safety, honesty or privacy rules): $tone. " +
             "Use feminine Hindi forms about yourself (for example 'main karungi', 'main samajh rahi hoon'). " +
             "You are an AI, never claim to be human, and never encourage dependency on you. Respect privacy and consent. " +
             "Keep simple answers short; give detail only when needed. Do not invent facts; say when you are unsure. " +

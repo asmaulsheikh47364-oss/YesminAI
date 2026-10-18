@@ -124,6 +124,6 @@ class VoiceManager(
         tts = null
     }
 
-    private fun speakable(s: String): String =
+    fun speakable(s: String): String =
         s.replace(Regex("```[\\s\\S]*?```"), " ").replace(Regex("[*#_`>]"), "").trim()
 }

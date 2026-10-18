@@ -94,6 +94,22 @@ class Prefs(ctx: Context) {
     var voiceRate: Float
         get() = sp.getFloat("voice_rate", 1.0f)
         set(v) { sp.edit().putFloat("voice_rate", v).apply() }
+    var profileId: String
+        get() = sp.getString("profile_id", "yesmin") ?: "yesmin"
+        set(v) { sp.edit().putString("profile_id", v).apply() }
+    var customName: String
+        get() = sp.getString("custom_name", "") ?: ""
+        set(v) { sp.edit().putString("custom_name", v).apply() }
+    var customTone: String
+        get() = sp.getString("custom_tone", "") ?: ""
+        set(v) { sp.edit().putString("custom_tone", v).apply() }
+    /** phone | gemini */
+    var voiceEngine: String
+        get() = sp.getString("voice_engine", "phone") ?: "phone"
+        set(v) { sp.edit().putString("voice_engine", v).apply() }
+    var ttsModel: String
+        get() = sp.getString("tts_model", "") ?: ""
+        set(v) { sp.edit().putString("tts_model", v).apply() }
     var onboardingDone: Boolean
         get() = sp.getBoolean("onboarding_done", false)
         set(v) { sp.edit().putBoolean("onboarding_done", v).apply() }
