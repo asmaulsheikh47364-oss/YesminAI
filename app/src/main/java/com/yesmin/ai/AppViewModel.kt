@@ -16,6 +16,8 @@ enum class VoiceState { Idle, Listening, Thinking, Speaking, Error }
 enum class BrainStatus { NotConnected, Connected, Error }
 data class ChatMsg(val fromUser: Boolean, val text: String, val error: Boolean = false)
 data class Pending(val description: String, val action: A11yAction)
+data class PendingReply(val msg: IncomingMessage, val text: String)
+data class ActionLog(val time: Long, val text: String, val undo: (() -> Unit)? = null)
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val ctx: Context = app.applicationContext
@@ -58,6 +60,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var ttsModelName by mutableStateOf(prefs.ttsModel)
     var reminders by mutableStateOf(listOf<Reminder>())
     var hideReminderText by mutableStateOf(prefs.hideReminderText)
+    var pendingReply by mutableStateOf<PendingReply?>(null)
+    val actionLog = mutableStateListOf<ActionLog>()
 
     private val voice = VoiceManager(ctx, { voiceState = it }, { micLevel = it })
     private var ttsNoticeShown = false
@@ -213,6 +217,54 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             Command.Network -> reply(PhoneInfo.network(ctx), speak)
             Command.DeviceInfo -> reply(PhoneInfo.device(), speak)
             is Command.Reminder -> createQuickReminder(cmd.title, cmd.minutes, speak)
+            is Command.Torch -> {
+                if (PhoneControl.torch(ctx, cmd.on)) {
+                    val msg = if (cmd.on) "Torch on kar di." else "Torch band kar di."
+                    logAction(msg, { PhoneControl.torch(ctx, !cmd.on) })
+                    reply(msg, speak)
+                } else {
+                    reply("Is phone mein torch nahi mili ya Android ne rok diya.", false, true)
+                }
+            }
+            is Command.Volume -> {
+                val (msg, prev) = PhoneControl.volume(ctx, cmd.action, cmd.percent)
+                logAction(msg, { PhoneControl.setVolumeRaw(ctx, prev) })
+                reply(msg, speak)
+            }
+            is Command.OpenPanel -> {
+                val name = if (cmd.page == "wifi") "Wi-Fi" else "Bluetooth"
+                if (PhoneControl.openSettings(ctx, cmd.page)) {
+                    logAction("$name settings khuli")
+                    reply("Android 10 mein app $name khud on/off nahi kar sakti, isliye uski Settings khol di hai. Wahan switch aap dabao.", speak)
+                } else {
+                    reply("$name settings nahi khul payi.", false, true)
+                }
+            }
+            is Command.Dnd -> {
+                val msg = PhoneControl.dnd(ctx, cmd.on)
+                logAction(msg)
+                reply(msg, speak)
+            }
+            is Command.Call -> startCall(cmd.target, speak)
+            is Command.Message -> startMessage(cmd.name, cmd.channel, cmd.body, speak)
+            Command.ReadMessages -> {
+                if (!notificationAccessOn()) {
+                    reply("Messages padhne ke liye Notification Access on karna hoga. More → Messages mein button hai.", speak)
+                } else {
+                    val l = MessageStore.messages.take(5)
+                    if (l.isEmpty()) reply("Abhi koi naya message nahi hai.", speak)
+                    else reply(l.joinToString("\n") { it.sender + " (" + it.app + "): " + it.text }, speak)
+                }
+            }
+            is Command.Reply -> {
+                val m = MessageStore.messages.firstOrNull { it.replyAction != null }
+                if (m == null) {
+                    reply("Jawab dene layak koi recent message nahi mila.", speak)
+                } else {
+                    pendingReply = PendingReply(m, cmd.text)
+                    reply(m.sender + " ko yeh jawab bhejna hai: \"" + cmd.text + "\". Neeche Bhejo ya Cancel dabao.", false)
+                }
+            }
             Command.ReminderHelp -> reply("Reminder ke liye bolo: '10 minute baad chai ke liye yaad dilao', ya More mein Reminders kholo.", speak)
             is Command.Calc -> {
                 val v = Calculator.eval(cmd.expr)
@@ -377,6 +429,109 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // ---------- phone control & messaging ----------
+    private fun logAction(text: String, undo: (() -> Unit)? = null) {
+        actionLog.add(0, ActionLog(System.currentTimeMillis(), text, undo))
+        while (actionLog.size > 15) actionLog.removeAt(actionLog.size - 1)
+    }
+
+    fun undoAction(i: Int) {
+        val a = actionLog.getOrNull(i) ?: return
+        a.undo?.invoke()
+        actionLog[i] = a.copy(text = "↩ " + a.text, undo = null)
+    }
+
+    fun notificationAccessOn(): Boolean =
+        NotificationManagerCompat.getEnabledListenerPackages(ctx).contains(ctx.packageName)
+
+    private sealed class Who {
+        class Ok(val name: String, val number: String) : Who()
+        class Ask(val text: String) : Who()
+    }
+
+    private fun resolveWho(target: String): Who {
+        val t = target.trim()
+        if (Regex("^[+0-9 \\-]{6,}$").matches(t)) return Who.Ok(t, t)
+        val found = Contacts.find(ctx, t)
+        return when {
+            found == null -> Who.Ask("Naam se dhundhne ke liye Contacts ki ijazat chahiye. More → Messages mein 'Contacts allow karo' dabao.")
+            found.isEmpty() -> Who.Ask("'" + t + "' naam ka contact nahi mila.")
+            Contacts.distinctNames(found).size > 1 -> Who.Ask("Kaunsa: " + Contacts.distinctNames(found).take(5).joinToString(", ") + "? Poora naam bolo.")
+            else -> Who.Ok(found[0].first, found[0].second)
+        }
+    }
+
+    private fun startCall(target: String, speak: Boolean) {
+        when (val w = resolveWho(target)) {
+            is Who.Ask -> reply(w.text, speak)
+            is Who.Ok -> dialNumber(w.name, w.number, speak)
+        }
+    }
+
+    fun dialNumber(name: String, number: String, speak: Boolean = false) {
+        if (PhoneControl.dial(ctx, number)) {
+            logAction("Dial: $name")
+            reply("$name ka number dialer mein khol diya hai. Call lagane ke liye aap hara button dabao.", speak)
+        } else {
+            reply("Dialer nahi khul paya.", false, true)
+        }
+    }
+
+    private fun startMessage(name: String, channel: String, body: String, speak: Boolean) {
+        if (body.isBlank()) {
+            reply("Message mein kya likhna hai? Jaise: 'Rahul ko whatsapp bhejo: kal milte hain'.", speak)
+            return
+        }
+        when (val w = resolveWho(name)) {
+            is Who.Ask -> reply(w.text, speak)
+            is Who.Ok -> openMessage(w.name, w.number, channel, body, speak)
+        }
+    }
+
+    fun openMessage(name: String, number: String, channel: String, body: String, speak: Boolean): Boolean {
+        val wa = channel == "whatsapp"
+        val ok = if (wa) PhoneControl.whatsapp(ctx, number, body) else PhoneControl.sms(ctx, number, body)
+        if (ok) {
+            logAction((if (wa) "WhatsApp" else "SMS") + " draft: " + name)
+            reply(name + " ke liye " + (if (wa) "WhatsApp" else "SMS") + " khol diya, message likha hua hai. Bhejne ke liye aap Send dabao.", speak)
+        } else {
+            reply((if (wa) "WhatsApp" else "SMS") + " nahi khul paya. Kya yeh app phone mein hai?", false, true)
+        }
+        return ok
+    }
+
+    fun confirmReply() {
+        val p = pendingReply ?: return
+        pendingReply = null
+        sendReplyDirect(p.msg, p.text)
+    }
+
+    fun cancelReply() {
+        pendingReply = null
+        reply("Theek hai, jawab cancel kar diya.", false)
+    }
+
+    fun sendReplyDirect(m: IncomingMessage, text: String) {
+        val ok = MessageReply.send(ctx, m, text)
+        if (ok) logAction("Reply bheja: " + m.sender)
+        reply(if (ok) m.sender + " ko jawab bhej diya." else "Jawab nahi ja paya (us message ka reply option ab nahi raha).", false, !ok)
+    }
+
+    fun draftMessage(idea: String, onResult: (String) -> Unit) {
+        gateGemini()?.let { notice = it; return }
+        val key = prefs.apiKey ?: return
+        busy = true
+        viewModelScope.launch {
+            val r = gemini.generate(
+                key, model,
+                Personas.toolSystem("Write one short, natural, polite message (WhatsApp style) for the idea below. Output only the message text, nothing else.", language),
+                listOf("user" to idea), temperature
+            )
+            busy = false
+            if (r.ok) onResult(r.text.trim()) else notice = r.text
+        }
+    }
+
     // ---------- reminders ----------
     fun refreshReminders() { reminders = db.reminders() }
 
@@ -471,6 +626,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun clearHistory() { db.clearHistory(); notice = "Saved history delete ho gayi." }
 
     fun wipeAll() {
+        MessageStore.clear()
+        pendingReply = null
+        actionLog.clear()
         db.reminders().forEach { ReminderScheduler.cancel(ctx, it.id) }
         db.clearReminders()
         refreshReminders()

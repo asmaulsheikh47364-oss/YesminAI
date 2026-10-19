@@ -43,6 +43,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -210,6 +211,22 @@ fun SettingsScreen(vm: AppViewModel, nav: NavHostController) {
                     )
                 }) { Text("App permissions") }
             }
+        }
+
+        Section("Messages & Contacts access") {
+            val contactsLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { refresh++ }
+            Text("Contacts: " + if (refresh >= 0 && Contacts.hasPermission(ctx)) "allowed" else "allowed nahi")
+            if (!(refresh >= 0 && Contacts.hasPermission(ctx))) {
+                Button(onClick = { contactsLauncher.launch(Manifest.permission.READ_CONTACTS) }) { Text("Contacts allow karo") }
+            }
+            Text("Notification Access (messages padhna/jawab dena): " + if (refresh >= 0 && NotificationManagerCompat.getEnabledListenerPackages(ctx).contains(ctx.packageName)) "ON" else "OFF")
+            Text(
+                "Yeh sirf WhatsApp/SMS jaisi messaging notifications dekhta hai. Kuch disk par save ya upload nahi hota; messages sirf memory mein rehte hain. Jawab bhejne se pehle hamesha aapse confirm poochha jaata hai.",
+                style = MaterialTheme.typography.bodySmall
+            )
+            OutlinedButton(onClick = {
+                ctx.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            }) { Text("Notification Access settings") }
         }
 
         Section("Privacy") {

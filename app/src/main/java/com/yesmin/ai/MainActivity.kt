@@ -98,7 +98,7 @@ fun MainScaffold(vm: AppViewModel) {
         Tab("home", "Home", "🏠"), Tab("chat", "Chat", "💬"), Tab("voice", "Voice", "🎤"),
         Tab("apps", "Apps", "📱"), Tab("more", "More", "☰")
     )
-    val moreRoutes = setOf("more", "brain", "tools", "settings", "memory", "calc", "device", "support", "profiles", "reminders")
+    val moreRoutes = setOf("more", "brain", "tools", "settings", "memory", "calc", "device", "support", "profiles", "reminders", "messages")
     Scaffold(
         snackbarHost = { SnackbarHost(snack) },
         bottomBar = {
@@ -132,6 +132,7 @@ fun MainScaffold(vm: AppViewModel) {
             composable("support") { SupportScreen() }
             composable("profiles") { ProfilesScreen(vm) }
             composable("reminders") { RemindersScreen(vm) }
+            composable("messages") { MessagesScreen(vm) }
         }
     }
 }

@@ -149,7 +149,8 @@ fun HomeScreen(vm: AppViewModel, nav: NavHostController) {
         Triple("🗂", "Memory", "memory"), Triple("🛠", "AI Tools", "tools"),
         Triple("📊", "Device Info", "device"), Triple("⚙️", "Settings", "settings"),
         Triple("🎭", "Personalities", "profiles"), Triple("⏰", "Reminders", "reminders"),
-        Triple("🧮", "Calculator", "calc"), Triple("🛟", "Help", "support")
+        Triple("🧮", "Calculator", "calc"), Triple("✉️", "Messages", "messages"),
+        Triple("🔒", "Privacy", "settings"), Triple("🛟", "Help", "support")
     )
     val quick = listOf(
         "▶ YouTube music" to "youtube par music kholo",
@@ -286,6 +287,19 @@ fun ChatScreen(vm: AppViewModel) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(onClick = { vm.confirmPending() }) { Text("Haan, karo") }
                         TextButton(onClick = { vm.cancelPending() }) { Text("Cancel") }
+                    }
+                }
+            }
+        }
+        vm.pendingReply?.let { p ->
+            Card(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
+                Column(Modifier.padding(12.dp)) {
+                    Text("Jawab bhejna hai?", fontWeight = FontWeight.Bold)
+                    Text(p.msg.sender + " (" + p.msg.app + ") ko jayega:")
+                    Text("\"" + p.text + "\"")
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = { vm.confirmReply() }) { Text("Bhejo") }
+                        TextButton(onClick = { vm.cancelReply() }) { Text("Cancel") }
                     }
                 }
             }

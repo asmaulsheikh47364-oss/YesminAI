@@ -48,6 +48,25 @@ class CommandRouterTest {
         assertEquals(Command.None, CommandRouter.parse("mujhe kuch yaad nahi aa raha"))
     }
 
+    @Test fun phoneControl() {
+        assertEquals(Command.Torch(true), CommandRouter.parse("torch on karo"))
+        assertEquals(Command.Torch(false), CommandRouter.parse("flashlight band karo"))
+        assertEquals(Command.Volume("up", null), CommandRouter.parse("volume badhao"))
+        assertEquals(Command.Volume("mute", null), CommandRouter.parse("volume mute"))
+        assertEquals(Command.Volume("set", 40), CommandRouter.parse("volume 40 percent"))
+        assertEquals(Command.OpenPanel("wifi"), CommandRouter.parse("wifi on karo"))
+        assertEquals(Command.Dnd(true), CommandRouter.parse("dnd on karo"))
+        assertEquals(Command.Call("rahul"), CommandRouter.parse("rahul ko call karo"))
+        assertEquals(Command.ReadMessages, CommandRouter.parse("mere message padho"))
+    }
+
+    @Test fun messagesAndReply() {
+        assertEquals(Command.Message("Rahul", "whatsapp", "kal milte hain"), CommandRouter.parse("Rahul ko whatsapp bhejo: kal milte hain"))
+        assertEquals(Command.Message("Mom", "sms", "late aaungi"), CommandRouter.parse("Mom ko message karo late aaungi"))
+        assertEquals(Command.Reply("ok done"), CommandRouter.parse("reply karo: ok done"))
+        assertEquals(Command.None, CommandRouter.parse("reply to this email politely"))
+    }
+
     @Test fun profileNamePrefix() {
         assertEquals(Command.OpenApp("youtube"), CommandRouter.parse("Zara youtube kholo"))
     }

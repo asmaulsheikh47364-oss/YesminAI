@@ -56,6 +56,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavHostController
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 // ---------- shared pieces ----------
 
@@ -175,6 +177,8 @@ fun VoiceScreen(vm: AppViewModel) {
 fun AppsScreen(vm: AppViewModel, nav: NavHostController) {
     var appName by remember { mutableStateOf("") }
     var ytQuery by remember { mutableStateOf("") }
+    var callTarget by remember { mutableStateOf("") }
+    val timeFmt = remember { SimpleDateFormat("hh:mm a", Locale.getDefault()) }
     val actions = listOf(
         Triple("▶", "Open YouTube", "youtube kholo"),
         Triple("🌐", "Open Google", "google kholo"),
@@ -183,7 +187,15 @@ fun AppsScreen(vm: AppViewModel, nav: NavHostController) {
         Triple("📷", "Open Camera", "camera kholo"),
         Triple("⚙", "Open Settings", "settings kholo"),
         Triple("🔋", "Check Battery", "battery kitni hai"),
-        Triple("📱", "Device Info", "device model batao")
+        Triple("📱", "Device Info", "device model batao"),
+        Triple("🔦", "Torch On", "torch on karo"),
+        Triple("🔦", "Torch Off", "torch off karo"),
+        Triple("🔊", "Volume +", "volume badhao"),
+        Triple("🔉", "Volume −", "volume kam karo"),
+        Triple("🔇", "Mute", "volume mute"),
+        Triple("📶", "Wi-Fi", "wifi on karo"),
+        Triple("🔵", "Bluetooth", "bluetooth on karo"),
+        Triple("🌙", "DND On", "dnd on karo")
     )
     val lastReply = vm.messages.lastOrNull { !it.fromUser }
     Column(
@@ -221,8 +233,21 @@ fun AppsScreen(vm: AppViewModel, nav: NavHostController) {
         }
         Text("YouTube ka search khulta hai; gaana chunke play karna aapko padta hai.", style = MaterialTheme.typography.bodySmall)
         Button(onClick = { nav.navigate("reminders") { launchSingleTop = true } }, modifier = Modifier.fillMaxWidth()) { Text("⏰ Set Reminder") }
-        Text("Agle steps mein aayega", style = MaterialTheme.typography.titleSmall)
-        Text("• Send Message (WhatsApp/SMS)\n• Call, Flashlight, Volume", style = MaterialTheme.typography.bodySmall)
+        Button(onClick = { nav.navigate("messages") { launchSingleTop = true } }, modifier = Modifier.fillMaxWidth()) { Text("✉️ Send Message / Call / Messages padho") }
+        Text("Call lagao", style = MaterialTheme.typography.titleSmall)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            OutlinedTextField(value = callTarget, onValueChange = { callTarget = it }, singleLine = true, modifier = Modifier.weight(1f), label = { Text("Naam ya number") })
+            Button(onClick = { vm.send(callTarget + " ko call karo", false) }, enabled = callTarget.isNotBlank()) { Text("📞") }
+        }
+        Text("Wi-Fi/Bluetooth: Android 10 mein app unhe khud on/off nahi kar sakti, sirf Settings khol deti hai. Call mein dialer khulta hai aur hara button aap dabate ho.", style = MaterialTheme.typography.bodySmall)
+        Text("Action history", style = MaterialTheme.typography.titleSmall)
+        if (vm.actionLog.isEmpty()) Text("Abhi koi action nahi hua.", style = MaterialTheme.typography.bodySmall)
+        vm.actionLog.forEachIndexed { i, a ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(timeFmt.format(a.time) + "  " + a.text, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+                if (a.undo != null) TextButton(onClick = { vm.undoAction(i) }) { Text("↩ Undo") }
+            }
+        }
     }
 }
 
@@ -235,6 +260,7 @@ fun MoreScreen(nav: NavHostController) {
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Text("More", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        NavRow("✉️", "Messages & Call", "Message bhejo, call lagao, aaye message padho aur jawab do") { nav.navigate("messages") { launchSingleTop = true } }
         NavRow("⏰", "Reminders", "Yaad dilane wale alarm aur notifications") { nav.navigate("reminders") { launchSingleTop = true } }
         NavRow("🎭", "AI Personalities", "Yesmin, Zara, Riya, Aisha ya apni khud ki") { nav.navigate("profiles") { launchSingleTop = true } }
         NavRow("🧠", "AI Brain", "Gemini key, model, connection test") { nav.navigate("brain") { launchSingleTop = true } }

@@ -18,6 +18,14 @@ sealed class Command {
     /** "10 minute baad ..." style quick reminder. */
     data class Reminder(val title: String, val minutes: Int) : Command()
     object ReminderHelp : Command()
+    data class Torch(val on: Boolean) : Command()
+    data class Volume(val action: String, val percent: Int?) : Command()
+    data class Call(val target: String) : Command()
+    data class Message(val name: String, val channel: String, val body: String) : Command()
+    data class OpenPanel(val page: String) : Command()
+    data class Dnd(val on: Boolean) : Command()
+    object ReadMessages : Command()
+    data class Reply(val text: String) : Command()
     object Battery : Command()
     object Time : Command()
     object Network : Command()
@@ -31,6 +39,10 @@ object CommandRouter {
         "^\\s*(?:yesmin[, ]*)?(?:calculate|calc|hisab|hisaab|solve)?\\s*([0-9+\\-*/().%x×÷ ]+)$",
         RegexOption.IGNORE_CASE
     )
+    private val msgRe = Regex(
+        "(?i)^\\s*(?:(?:yesmin|zara|riya|aisha)[, ]*)?(.+?)\\s+ko\\s+(whatsapp|sms|message|msg)(?:\\s+(?:message|msg))?(?:\\s+(?:par|pe|mein|me))?\\s+(?:bhejo|bhej do|karo|send|likho)\\s*[:,-]?\\s*(.*)$"
+    )
+    private val replyRe = Regex("(?i)^\\s*(?:(?:yesmin|zara|riya|aisha)[, ]*)?reply\\s*(?:(?:karo|do|bhejo|send)\\s*[:,-]?|[:,-])\\s*(.+)$")
     private val typeRe = Regex("(?i)^(?:yesmin[, ]*)?type\\s+(.+)$")
 
     private val stop = setOf(
@@ -78,6 +90,10 @@ object CommandRouter {
         "बजाओ" to "bajao", "बजा" to "baja", "चला" to "chala", "चलाइए" to "chalaiye", "सुनाइए" to "sunaiye", "कोई" to "koi", "अच्छा" to "achha",
         "मिनट" to "minute", "घंटे" to "ghante", "घंटा" to "ghanta", "रिमाइंडर" to "reminder", "याद" to "yaad",
         "दिलाओ" to "dilao", "दिलाना" to "dilana", "बाद" to "baad", "अलार्म" to "alarm", "सेट" to "set",
+        "टॉर्च" to "torch", "फ्लैशलाइट" to "flashlight", "जलाओ" to "jalao", "बंद" to "band", "ऑन" to "on", "ऑफ" to "off",
+        "वॉल्यूम" to "volume", "आवाज" to "volume", "बढाओ" to "badhao", "बढ\u095Dाओ" to "badhao", "घटाओ" to "ghatao", "कम" to "kam",
+        "म्यूट" to "mute", "कॉल" to "call", "मैसेज" to "message", "मैसेजेस" to "messages", "पढो" to "padho", "पढ\u095Dो" to "padho",
+        "सुनो" to "suno", "ब्लूटूथ" to "bluetooth", "वाईफाई" to "wifi",
         "यस्मिन" to "yesmin", "यसमिन" to "yesmin", "येस्मिन" to "yesmin", "यस्मीन" to "yesmin"
     )
 
@@ -106,6 +122,12 @@ object CommandRouter {
             if (e.any { it.isDigit() } && e.any { it in "+-*/x×÷%" }) return Command.Calc(e)
         }
 
+        msgRe.matchEntire(text)?.let { m ->
+            val ch = if (m.groupValues[2].lowercase() == "whatsapp") "whatsapp" else "sms"
+            return Command.Message(m.groupValues[1].trim(), ch, m.groupValues[3].trim())
+        }
+        replyRe.matchEntire(text)?.let { m -> return Command.Reply(m.groupValues[1].trim()) }
+
         val hasReminderNoun = t.any { it in setOf("reminder", "remind", "alarm") }
         val hasYaadDila = "yaad" in t && t.any { it in setOf("dilao", "dilana", "dila", "dilaiye", "dilado", "dijiye") }
         if ((hasReminderNoun || hasYaadDila) && t.size <= 14) {
@@ -130,6 +152,38 @@ object CommandRouter {
             }
             return Command.ReminderHelp
         }
+
+        val onWords = setOf("on", "chalu", "jalao", "start", "kholo", "enable")
+        val offWords = setOf("off", "band", "bandh", "bujhao", "stop", "disable")
+        val turnOn = t.any { it in onWords }
+        val turnOff = t.any { it in offWords }
+        if (t.size <= 6 && t.any { it in setOf("torch", "flashlight", "tourch", "torchlight") } && (turnOn || turnOff)) {
+            return Command.Torch(!turnOff)
+        }
+        if (t.size <= 7 && "volume" in t) {
+            val pct = t.firstNotNullOfOrNull { it.toIntOrNull() }
+            val action = when {
+                "mute" in t -> "mute"
+                t.any { it in setOf("badhao", "up", "increase", "zyada", "tez", "plus") } -> "up"
+                t.any { it in setOf("kam", "down", "ghatao", "decrease", "dheema", "low", "minus") } -> "down"
+                "max" in t || "full" in t -> "max"
+                pct != null -> "set"
+                else -> ""
+            }
+            if (action.isNotEmpty()) return Command.Volume(action, pct)
+        }
+        if (t.size <= 6 && "wifi" in t && (turnOn || turnOff)) return Command.OpenPanel("wifi")
+        if (t.size <= 6 && "bluetooth" in t && (turnOn || turnOff)) return Command.OpenPanel("bluetooth")
+        if (t.size <= 7 && ("dnd" in t || "disturb" in t) && (turnOn || turnOff)) return Command.Dnd(!turnOff)
+        val callIdx = t.indexOfFirst { it == "call" || it == "dial" }
+        if (callIdx >= 0 && t.size <= 7 && t.any { it in setOf("karo", "kar", "lagao", "laga", "do", "dial", "kardo") }) {
+            val fill = setOf("ko", "par", "pe", "yesmin", "mujhe", "please", "plz", "ek")
+            val name = t.take(callIdx).filter { it !in fill }.joinToString(" ")
+            if (name.isNotBlank()) return Command.Call(name)
+        }
+        if (t.size <= 6 && t.any { it in setOf("message", "messages", "msg", "msgs", "sandesh") } &&
+            t.any { it in setOf("padho", "padh", "suno", "sunao", "read", "batao", "dikhao") }
+        ) return Command.ReadMessages
 
         if (t.size <= 7) {
             if ("battery" in t || "बैटरी" in t) return Command.Battery
