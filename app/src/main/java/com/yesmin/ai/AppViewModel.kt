@@ -75,6 +75,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private val voice = VoiceManager(ctx, { voiceState = it }, { micLevel = it })
     private var ttsNoticeShown = false
+    private var lastUserText = ""
     private val pcm = PcmPlayer()
 
     init {
@@ -100,7 +101,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         prefs.onboardingDone = true
     }
     fun openApp(name: String) { if (name.isNotBlank()) handleCommand(Command.OpenApp(name.trim()), false) }
-    fun openYouTubeSearch(q: String) { if (q.isNotBlank()) handleCommand(Command.YouTube(q.trim()), false) }
+    fun openYouTubeSearch(q: String) { if (q.isNotBlank()) { lastUserText = q.trim(); handleCommand(Command.YouTube(q.trim()), false) } }
     fun setVoice(v: String?) { voiceName = v; prefs.voiceName = v }
     fun changeMemoryEnabled(v: Boolean) { memoryEnabled = v; prefs.memoryEnabled = v }
     fun changeSaveHistory(v: Boolean) { saveHistory = v; prefs.saveHistory = v }
@@ -198,6 +199,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val t = text.trim()
         if (t.isEmpty() || busy) return
         messages.add(ChatMsg(true, t))
+        lastUserText = t
         if (saveHistory && !tempMode) db.addHistory(true, t)
         val cmd = CommandRouter.parse(t)
         if (cmd !is Command.None) handleCommand(cmd, speak) else askGemini(speak)
@@ -205,19 +207,22 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun handleCommand(cmd: Command, speak: Boolean) {
         when (cmd) {
-            is Command.OpenApp -> when (val r = AppLauncher.open(ctx, cmd.name)) {
-                is AppLauncher.R.Opened -> reply("${r.label} khol diya.", speak)
-                AppLauncher.R.NotFound -> reply("'${cmd.name}' naam ka app is phone mein nahi mila.", speak)
-                is AppLauncher.R.Ambiguous -> reply("Kaunsa kholna hai: ${r.labels.joinToString(", ")}? Poora naam bolo.", speak)
-                is AppLauncher.R.Failed -> reply("App nahi khul paya: ${r.msg}", false, true)
+            is Command.OpenApp -> {
+                if (speak) {
+                    viewModelScope.launch {
+                        speakThenWait("Theek hai, " + cmd.name + " khol rahi hoon.")
+                        doOpenApp(cmd.name, true)
+                    }
+                } else {
+                    doOpenApp(cmd.name, false)
+                }
             }
             is Command.YouTube -> {
                 var q = cmd.query
                 if (q.isBlank()) {
                     q = (if (memoryEnabled) memories.firstOrNull { it.category == "music" || it.category == "favorite" }?.text else null) ?: "music"
                 }
-                val ytKey = prefs.youtubeKey
-                if (ytKey != null) playOnYouTube(ytKey, q, speak) else openYouTubeSearchPage(q, speak)
+                youtubeFlow(q, speak)
             }
             Command.Battery -> reply(PhoneInfo.battery(ctx), speak)
             Command.Time -> reply(PhoneInfo.time(), speak)
@@ -279,6 +284,26 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             }
             is Command.A11y -> handleA11y(cmd.action, speak)
             Command.None -> {}
+        }
+    }
+
+    private fun doOpenApp(name: String, speakErrors: Boolean) {
+        when (val r = AppLauncher.open(ctx, name)) {
+            is AppLauncher.R.Opened -> reply("${r.label} khol diya.", false)
+            AppLauncher.R.NotFound -> reply("'$name' naam ka app is phone mein nahi mila.", speakErrors)
+            is AppLauncher.R.Ambiguous -> reply("Kaunsa kholna hai: ${r.labels.joinToString(", ")}? Poora naam bolo.", speakErrors)
+            is AppLauncher.R.Failed -> reply("App nahi khul paya: ${r.msg}", false, true)
+        }
+    }
+
+    /** Speaks first and waits for the sentence to finish, so another app opening does not cut Yesmin's voice. */
+    private suspend fun speakThenWait(text: String) {
+        speakWith(text)
+        delay(300)
+        var waited = 0
+        while ((voiceState == VoiceState.Speaking || voiceState == VoiceState.Thinking) && waited < 4000) {
+            delay(100)
+            waited += 100
         }
     }
 
@@ -437,6 +462,30 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     // ---------- YouTube & photo AI ----------
+    private fun youtubeFlow(q0: String, speak: Boolean) {
+        viewModelScope.launch {
+            if (speak) speakThenWait("Theek hai, YouTube par dhundh rahi hoon.")
+            val q = refineYoutubeQuery(q0)
+            val key = prefs.youtubeKey
+            if (key != null) playOnYouTube(key, q, false) else openYouTubeSearchPage(q, false)
+        }
+    }
+
+    /** Lets Gemini turn the spoken sentence into a clean search query (artist + song/type). */
+    private suspend fun refineYoutubeQuery(fallback: String): String {
+        val key = prefs.apiKey ?: return fallback
+        if (!disclosure || lastUserText.isBlank()) return fallback
+        val r = gemini.generate(
+            key, model,
+            "Turn the user's spoken request into the single best YouTube search query for the song or video they want " +
+                "(artist name plus song or type, in Roman letters, e.g. 'Arijit Singh new songs'). " +
+                "Output only the query, at most 8 words, no quotes, no explanation.",
+            listOf("user" to lastUserText), 0.2f
+        )
+        val out = r.text.trim().trim('"').lines().firstOrNull().orEmpty().trim()
+        return if (r.ok && out.isNotBlank() && out.length <= 80) out else fallback
+    }
+
     private fun openYouTubeSearchPage(q: String, speak: Boolean) {
         if (AppLauncher.openYouTube(ctx, q)) {
             logAction("YouTube search: $q")
