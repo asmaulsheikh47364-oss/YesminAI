@@ -113,6 +113,21 @@ class Prefs(ctx: Context) {
     var hideReminderText: Boolean
         get() = sp.getBoolean("hide_reminder_text", false)
         set(v) { sp.edit().putBoolean("hide_reminder_text", v).apply() }
+    var lockEnabled: Boolean
+        get() = sp.getBoolean("lock_enabled", false)
+        set(v) { sp.edit().putBoolean("lock_enabled", v).apply() }
+    var lockSalt: String
+        get() = sp.getString("lock_salt", "") ?: ""
+        set(v) { sp.edit().putString("lock_salt", v).apply() }
+    var lockHash: String
+        get() = sp.getString("lock_hash", "") ?: ""
+        set(v) { sp.edit().putString("lock_hash", v).apply() }
+    var biometricEnabled: Boolean
+        get() = sp.getBoolean("biometric_enabled", false)
+        set(v) { sp.edit().putBoolean("biometric_enabled", v).apply() }
+    var supportNumber: String
+        get() = sp.getString("support_number", "") ?: ""
+        set(v) { sp.edit().putString("support_number", v).apply() }
     var onboardingDone: Boolean
         get() = sp.getBoolean("onboarding_done", false)
         set(v) { sp.edit().putBoolean("onboarding_done", v).apply() }

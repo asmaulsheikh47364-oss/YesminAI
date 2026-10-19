@@ -61,6 +61,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var reminders by mutableStateOf(listOf<Reminder>())
     var hideReminderText by mutableStateOf(prefs.hideReminderText)
     var pendingReply by mutableStateOf<PendingReply?>(null)
+    var lockEnabled by mutableStateOf(prefs.lockEnabled)
+    var biometricEnabled by mutableStateOf(prefs.biometricEnabled)
+    var locked by mutableStateOf(prefs.lockEnabled)
+    var supportNumber by mutableStateOf(prefs.supportNumber)
+    var tempMode by mutableStateOf(false)
+    private var wrongAttempts = 0
+    private var lockoutUntil = 0L
     val actionLog = mutableStateListOf<ActionLog>()
 
     private val voice = VoiceManager(ctx, { voiceState = it }, { micLevel = it })
@@ -179,7 +186,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun reply(text: String, speak: Boolean, error: Boolean = false) {
         messages.add(ChatMsg(false, text, error))
-        if (saveHistory && !error) db.addHistory(false, text)
+        if (saveHistory && !error && !tempMode) db.addHistory(false, text)
         if (error) { voiceState = VoiceState.Error; return }
         if (speak) speakWith(text) else voiceState = VoiceState.Idle
     }
@@ -188,7 +195,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val t = text.trim()
         if (t.isEmpty() || busy) return
         messages.add(ChatMsg(true, t))
-        if (saveHistory) db.addHistory(true, t)
+        if (saveHistory && !tempMode) db.addHistory(true, t)
         val cmd = CommandRouter.parse(t)
         if (cmd !is Command.None) handleCommand(cmd, speak) else askGemini(speak)
     }
@@ -204,7 +211,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             is Command.YouTube -> {
                 var q = cmd.query
                 if (q.isBlank()) {
-                    q = (if (memoryEnabled) memories.firstOrNull { it.category == "favorite" }?.text else null) ?: "music"
+                    q = (if (memoryEnabled) memories.firstOrNull { it.category == "music" || it.category == "favorite" }?.text else null) ?: "music"
                 }
                 if (AppLauncher.openYouTube(ctx, q)) {
                     reply("YouTube par '$q' ka search khol diya. Gaana aapko khud chunke play karna hoga — main auto-play nahi kar sakti.", speak)
@@ -322,7 +329,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val hist = messages.filter { !it.error }.takeLast(12)
             .map { (if (it.fromUser) "user" else "model") to it.text }
             .dropWhile { it.first != "user" }
-        val mem = if (memoryEnabled) memories.filter { it.category != "snippet" }.take(30).map { it.text } else emptyList()
+        val mem = if (memoryEnabled && !tempMode) memories.filter { it.category != "snippet" }.take(30).map { it.text } else emptyList()
         viewModelScope.launch {
             val r = gemini.generate(key, model, Personas.chatSystem(persona, language, mem, activeProfile().name, activeProfile().tone), hist, temperature)
             busy = false
@@ -428,6 +435,48 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             toolBusy = false
         }
     }
+
+    // ---------- app lock & support ----------
+    /** Returns null on success, otherwise a message to show. */
+    fun tryUnlock(pin: String): String? {
+        val now = System.currentTimeMillis()
+        if (now < lockoutUntil) return "Bahut galat koshish. " + ((lockoutUntil - now) / 1000 + 1) + " second baad try karo."
+        if (PinLock.check(prefs, pin)) {
+            wrongAttempts = 0
+            locked = false
+            return null
+        }
+        wrongAttempts++
+        if (wrongAttempts >= 5) {
+            wrongAttempts = 0
+            lockoutUntil = now + 30_000L
+            return "5 baar galat PIN. 30 second ruko."
+        }
+        return "PIN galat hai."
+    }
+
+    fun unlock() { locked = false }
+
+    fun enableLock(pin: String) {
+        PinLock.set(prefs, pin)
+        prefs.lockEnabled = true
+        lockEnabled = true
+        locked = false
+        notice = "App lock on ho gaya."
+    }
+
+    fun disableLock() {
+        PinLock.clear(prefs)
+        prefs.lockEnabled = false
+        prefs.biometricEnabled = false
+        lockEnabled = false
+        biometricEnabled = false
+        locked = false
+        notice = "App lock band kar diya."
+    }
+
+    fun changeBiometric(v: Boolean) { biometricEnabled = v; prefs.biometricEnabled = v }
+    fun changeSupportNumber(v: String) { supportNumber = v.trim(); prefs.supportNumber = supportNumber }
 
     // ---------- phone control & messaging ----------
     private fun logAction(text: String, undo: (() -> Unit)? = null) {
@@ -606,6 +655,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val t = text.trim()
         if (t.isEmpty()) return false
         if (!memoryEnabled) { notice = "Memory band hai (Settings → Memory)."; return false }
+        if (tempMode) { notice = "Temporary chat mein kuch save nahi hota."; return false }
         if (Sensitive.looksSensitive(t)) { notice = "Password/PIN/card jaisi sensitive cheez save nahi karti."; return false }
         val ok = db.add(category, t)
         refreshMemories()

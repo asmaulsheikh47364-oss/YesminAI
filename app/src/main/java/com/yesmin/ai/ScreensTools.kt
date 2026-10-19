@@ -178,14 +178,20 @@ fun CalcScreen() {
 
 @Composable
 fun MemoryScreen(vm: AppViewModel) {
-    val cats = listOf("note", "preference", "favorite", "task", "snippet")
+    val cats = listOf("music", "food", "people", "schedule", "projects", "devices", "preference", "note", "task", "favorite", "snippet")
+    val emoji = mapOf(
+        "music" to "🎵", "food" to "🍽", "people" to "👥", "schedule" to "📅", "projects" to "💼",
+        "devices" to "📱", "preference" to "⚙️", "note" to "📝", "task" to "✅", "favorite" to "⭐", "snippet" to "💻"
+    )
+    fun catLabel(c: String) = (emoji[c] ?: "") + " " + c
+    var search by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf<String?>(null) }
     var cat by remember { mutableStateOf("note") }
     var text by remember { mutableStateOf("") }
     var editing by remember { mutableStateOf<MemoryItem?>(null) }
     var editText by remember { mutableStateOf("") }
     var confirmClear by remember { mutableStateOf(false) }
-    val shown = vm.memories.filter { filter == null || it.category == filter }
+    val shown = vm.memories.filter { (filter == null || it.category == filter) && (search.isBlank() || it.text.contains(search, ignoreCase = true)) }
 
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("Memory, Notes & Tasks", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
@@ -194,13 +200,14 @@ fun MemoryScreen(vm: AppViewModel) {
                 "Password/PIN/card save mat karo. Memory " + if (vm.memoryEnabled) "ON hai." else "OFF hai (Settings mein on karo).",
             style = MaterialTheme.typography.bodySmall
         )
+        OutlinedTextField(value = search, onValueChange = { search = it }, singleLine = true, label = { Text("🔍 Memory mein khojo") }, modifier = Modifier.fillMaxWidth())
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             FilterChip(selected = filter == null, onClick = { filter = null }, label = { Text("all") })
-            cats.forEach { c -> FilterChip(selected = filter == c, onClick = { filter = c }, label = { Text(c) }) }
+            cats.forEach { c -> FilterChip(selected = filter == c, onClick = { filter = c }, label = { Text(catLabel(c)) }) }
         }
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("Nayi entry:", Modifier.padding(top = 8.dp))
-            cats.filter { it != "snippet" }.forEach { c -> FilterChip(selected = cat == c, onClick = { cat = c }, label = { Text(c) }) }
+            cats.filter { it != "snippet" }.forEach { c -> FilterChip(selected = cat == c, onClick = { cat = c }, label = { Text(catLabel(c)) }) }
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             OutlinedTextField(value = text, onValueChange = { text = it }, modifier = Modifier.weight(1f), label = { Text("jaise: favorite music Arijit Singh") })
@@ -211,7 +218,7 @@ fun MemoryScreen(vm: AppViewModel) {
             items(shown, key = { it.id }) { m ->
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(12.dp)) {
-                        Text(m.category, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                        Text(catLabel(m.category), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                         Text(m.text.take(400))
                         Row {
                             TextButton(onClick = { editing = m; editText = m.text }) { Text("Edit") }

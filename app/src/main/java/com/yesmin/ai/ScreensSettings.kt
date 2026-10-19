@@ -40,7 +40,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.app.NotificationManagerCompat
@@ -97,6 +100,15 @@ fun SettingsScreen(vm: AppViewModel, nav: NavHostController) {
                 value = nm, onValueChange = { nm = it; vm.changeUserName(it) }, singleLine = true,
                 label = { Text("Aapka naam") }, modifier = Modifier.fillMaxWidth()
             )
+        }
+
+        Section("Support contact") {
+            var sn by remember { mutableStateOf(vm.supportNumber) }
+            OutlinedTextField(
+                value = sn, onValueChange = { sn = it; vm.changeSupportNumber(it) }, singleLine = true,
+                label = { Text("Support number (jo aap set karo)") }, modifier = Modifier.fillMaxWidth()
+            )
+            Text("Yeh number sirf Help & Support mein Call/WhatsApp button ke liye hai. Khaali chhodo to buttons nahi dikhte.", style = MaterialTheme.typography.bodySmall)
         }
 
         Section("Language") {
@@ -210,6 +222,52 @@ fun SettingsScreen(vm: AppViewModel, nav: NavHostController) {
                             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     )
                 }) { Text("App permissions") }
+            }
+        }
+
+        Section("App Lock") {
+            var showSet by remember { mutableStateOf(false) }
+            var p1 by remember { mutableStateOf("") }
+            var p2 by remember { mutableStateOf("") }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("PIN se app lock", Modifier.weight(1f))
+                Switch(checked = vm.lockEnabled, onCheckedChange = { on -> if (on) showSet = true else vm.disableLock() })
+            }
+            if (vm.lockEnabled) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Fingerprint se unlock", Modifier.weight(1f))
+                    Switch(checked = vm.biometricEnabled, onCheckedChange = { vm.changeBiometric(it) }, enabled = Biometric.available(ctx))
+                }
+                if (!Biometric.available(ctx)) Text("Is phone par fingerprint set nahi hai ya support nahi.", style = MaterialTheme.typography.bodySmall)
+                OutlinedButton(onClick = { showSet = true }) { Text("PIN badlo") }
+            }
+            Text("Lock tab lagta hai jab app 30 second se zyada background mein rahe. PIN kahin save nahi hota (sirf secure hash). PIN bhool gaye to app ka data clear karna padega.", style = MaterialTheme.typography.bodySmall)
+            if (showSet) {
+                AlertDialog(
+                    onDismissRequest = { showSet = false; p1 = ""; p2 = "" },
+                    title = { Text("Naya PIN (4 se 8 ank)") },
+                    text = {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedTextField(
+                                value = p1, onValueChange = { if (it.length <= 8 && it.all { c -> c.isDigit() }) p1 = it }, singleLine = true,
+                                label = { Text("PIN") }, visualTransformation = PasswordVisualTransformation(),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword)
+                            )
+                            OutlinedTextField(
+                                value = p2, onValueChange = { if (it.length <= 8 && it.all { c -> c.isDigit() }) p2 = it }, singleLine = true,
+                                label = { Text("PIN dobara") }, visualTransformation = PasswordVisualTransformation(),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword)
+                            )
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            if (p1.length >= 4 && p1 == p2) { vm.enableLock(p1); showSet = false; p1 = ""; p2 = "" }
+                            else vm.notice = "PIN 4 se 8 ank ka ho aur dono baar same ho."
+                        }) { Text("Save") }
+                    },
+                    dismissButton = { TextButton(onClick = { showSet = false; p1 = ""; p2 = "" }) { Text("Cancel") } }
+                )
             }
         }
 

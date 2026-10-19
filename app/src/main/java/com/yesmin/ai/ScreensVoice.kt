@@ -306,7 +306,8 @@ fun DeviceScreen() {
 // ---------- Help & Support ----------
 
 @Composable
-fun SupportScreen() {
+fun SupportScreen(vm: AppViewModel) {
+    val ctx = LocalContext.current
     val faq = listOf(
         "Gemini key kahan se milti hai?" to "aistudio.google.com/apikey par free key banao, phir AI Brain mein paste karke Save & Test dabao.",
         "Jawab nahi aa raha / 503 error?" to "Google ka server kabhi vyast hota hai. Ek-do baar dobara try karo ya AI Brain mein doosra model chuno.",
@@ -319,6 +320,18 @@ fun SupportScreen() {
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Text("Help & Support", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        if (vm.supportNumber.isNotBlank()) {
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("Contact Us", fontWeight = FontWeight.Bold)
+                    Text(vm.supportNumber, style = MaterialTheme.typography.bodySmall)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = { PhoneControl.dial(ctx, vm.supportNumber) }) { Text("📞 Call") }
+                        OutlinedButton(onClick = { PhoneControl.whatsapp(ctx, vm.supportNumber, "") }) { Text("WhatsApp") }
+                    }
+                }
+            }
+        }
         faq.forEach { (q, a) ->
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(14.dp)) {

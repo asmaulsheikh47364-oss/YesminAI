@@ -253,6 +253,7 @@ fun ChatScreen(vm: AppViewModel) {
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 6.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
+            FilterChip(selected = vm.tempMode, onClick = { vm.tempMode = !vm.tempMode }, label = { Text("🕶 Temporary chat") })
             Personas.names.forEach { n ->
                 FilterChip(selected = vm.persona == n, onClick = { vm.changePersona(n) }, label = { Text(n) })
             }

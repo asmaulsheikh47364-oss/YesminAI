@@ -3,8 +3,10 @@
 package com.yesmin.ai
 
 import android.os.Bundle
+import android.os.SystemClock
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.viewModels
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -34,10 +36,23 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 
 class MainActivity : ComponentActivity() {
+    private val vm: AppViewModel by viewModels()
+    private var stoppedAt = 0L
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         ReminderScheduler.createChannel(this)
         setContent { YesminRoot() }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        stoppedAt = SystemClock.elapsedRealtime()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        if (vm.lockEnabled && stoppedAt > 0 && SystemClock.elapsedRealtime() - stoppedAt > 30_000L) vm.locked = true
     }
 }
 
@@ -63,9 +78,11 @@ fun YesminRoot() {
     var dismissed by remember { mutableStateOf(false) }
     YesminTheme(dark) {
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-            if (vm.onboardingDone) MainScaffold(vm) else OnboardingScreen(vm)
+            if (vm.lockEnabled && vm.locked) LockScreen(vm)
+            else if (vm.onboardingDone) MainScaffold(vm)
+            else OnboardingScreen(vm)
         }
-        if (vm.onboardingDone && !vm.disclosure && !dismissed) {
+        if (vm.onboardingDone && !vm.disclosure && !dismissed && !(vm.lockEnabled && vm.locked)) {
             AlertDialog(
                 onDismissRequest = {},
                 title = { Text("Privacy notice") },
@@ -129,7 +146,7 @@ fun MainScaffold(vm: AppViewModel) {
             composable("memory") { MemoryScreen(vm) }
             composable("calc") { CalcScreen() }
             composable("device") { DeviceScreen() }
-            composable("support") { SupportScreen() }
+            composable("support") { SupportScreen(vm) }
             composable("profiles") { ProfilesScreen(vm) }
             composable("reminders") { RemindersScreen(vm) }
             composable("messages") { MessagesScreen(vm) }
