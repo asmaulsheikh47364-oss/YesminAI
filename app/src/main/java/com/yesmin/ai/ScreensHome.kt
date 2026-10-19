@@ -150,7 +150,8 @@ fun HomeScreen(vm: AppViewModel, nav: NavHostController) {
         Triple("📊", "Device Info", "device"), Triple("⚙️", "Settings", "settings"),
         Triple("🎭", "Personalities", "profiles"), Triple("⏰", "Reminders", "reminders"),
         Triple("🧮", "Calculator", "calc"), Triple("✉️", "Messages", "messages"),
-        Triple("🔒", "Privacy", "settings"), Triple("🛟", "Help", "support")
+        Triple("🔒", "Privacy", "settings"), Triple("🛟", "Help", "support"),
+        Triple("📷", "Photo AI", "vision"), Triple("💻", "Coding", "tool/code_gen")
     )
     val quick = listOf(
         "▶ YouTube music" to "youtube par music kholo",

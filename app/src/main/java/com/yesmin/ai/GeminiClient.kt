@@ -82,6 +82,39 @@ class GeminiClient {
         }
     }
 
+    /** Photo understanding: sends one JPEG plus a question. */
+    suspend fun generateVision(key: String, model: String, system: String, question: String, jpeg: ByteArray): AiResult = withContext(Dispatchers.IO) {
+        try {
+            val m = model.trim()
+            if (!Regex("[A-Za-z0-9._-]+").matches(m)) return@withContext AiResult(false, "Model ka naam galat hai.")
+            val img = JSONObject().put(
+                "inlineData",
+                JSONObject().put("mimeType", "image/jpeg").put("data", android.util.Base64.encodeToString(jpeg, android.util.Base64.NO_WRAP))
+            )
+            val parts = JSONArray().put(img).put(JSONObject().put("text", question))
+            val body = JSONObject()
+            body.put("systemInstruction", JSONObject().put("parts", JSONArray().put(JSONObject().put("text", system))))
+            body.put("contents", JSONArray().put(JSONObject().put("role", "user").put("parts", parts)))
+            var r = request("POST", "$base/models/$m:generateContent", key, body.toString())
+            var tries = 0
+            while ((r.first == 503 || r.first == 500) && tries < 3) {
+                tries++
+                delay(2000L * tries)
+                r = request("POST", "$base/models/$m:generateContent", key, body.toString())
+            }
+            if (r.first != 200) return@withContext AiResult(false, friendly(r.first, r.second, m))
+            val cands = JSONObject(r.second).optJSONArray("candidates")
+            val ps = cands?.optJSONObject(0)?.optJSONObject("content")?.optJSONArray("parts")
+            if (ps == null) return@withContext AiResult(false, "Gemini ne photo ka jawab nahi diya.")
+            val sb = StringBuilder()
+            for (i in 0 until ps.length()) sb.append(ps.getJSONObject(i).optString("text"))
+            val out = sb.toString().trim()
+            if (out.isEmpty()) AiResult(false, "Khaali jawab aaya.") else AiResult(true, out)
+        } catch (e: Exception) {
+            AiResult(false, netError(e))
+        }
+    }
+
     /** Gemini text-to-speech: returns raw 16-bit mono PCM at 24 kHz in AiResult.audio. */
     suspend fun speech(key: String, model: String, voiceName: String, text: String): AiResult = withContext(Dispatchers.IO) {
         try {

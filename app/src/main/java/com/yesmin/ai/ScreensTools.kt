@@ -122,10 +122,12 @@ fun ToolsScreen(vm: AppViewModel, nav: NavHostController) {
             }
         }
 
+        ToolCard("Photo AI", "Photo dikhao, sawaal poochho (Gemini Vision)", "Gemini") { nav.navigate("vision") }
+
         Text("Abhi available nahi", style = MaterialTheme.typography.titleMedium)
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(14.dp)) {
-                Text("Image understanding, reminders/alarms, wake-word — is version mein implement nahi hue (FEATURES.md dekho).", style = MaterialTheme.typography.bodySmall)
+                Text("\"Hey Yesmin\" bolkar jagana abhi nahi hai (battery aur Android ki pabandiyon ki wajah se). Mic button dabakar baat karo.", style = MaterialTheme.typography.bodySmall)
             }
         }
     }

@@ -53,6 +53,22 @@ object AppLauncher {
         }
     }
 
+    /** Opens one specific video in the YouTube app (or browser). YouTube decides whether it starts playing by itself. */
+    fun openYouTubeVideo(ctx: Context, id: String): Boolean {
+        val base = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/watch?v=" + id)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        try {
+            ctx.startActivity(Intent(base).setPackage("com.google.android.youtube"))
+            return true
+        } catch (e: Exception) {
+        }
+        return try {
+            ctx.startActivity(base)
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
     /** Opens a YouTube search page. Does not (and cannot reliably) auto-play anything. */
     fun openYouTube(ctx: Context, query: String): Boolean {
         val uri = Uri.parse("https://www.youtube.com/results?search_query=" + URLEncoder.encode(query, "UTF-8"))

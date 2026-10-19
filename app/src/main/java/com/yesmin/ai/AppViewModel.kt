@@ -66,6 +66,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var locked by mutableStateOf(prefs.lockEnabled)
     var supportNumber by mutableStateOf(prefs.supportNumber)
     var tempMode by mutableStateOf(false)
+    var visionOutput by mutableStateOf("")
+    var hasYtKey by mutableStateOf(prefs.youtubeKey != null)
+    var ytResults by mutableStateOf(listOf<YouTubeClient.Video>())
     private var wrongAttempts = 0
     private var lockoutUntil = 0L
     val actionLog = mutableStateListOf<ActionLog>()
@@ -213,11 +216,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 if (q.isBlank()) {
                     q = (if (memoryEnabled) memories.firstOrNull { it.category == "music" || it.category == "favorite" }?.text else null) ?: "music"
                 }
-                if (AppLauncher.openYouTube(ctx, q)) {
-                    reply("YouTube par '$q' ka search khol diya. Gaana aapko khud chunke play karna hoga — main auto-play nahi kar sakti.", speak)
-                } else {
-                    reply("YouTube ya browser nahi khul paya.", false, true)
-                }
+                val ytKey = prefs.youtubeKey
+                if (ytKey != null) playOnYouTube(ytKey, q, speak) else openYouTubeSearchPage(q, speak)
             }
             Command.Battery -> reply(PhoneInfo.battery(ctx), speak)
             Command.Time -> reply(PhoneInfo.time(), speak)
@@ -432,6 +432,73 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val r = gemini.generate(key, model, Personas.toolSystem(instruction, language), listOf("user" to input), temperature)
             toolOutput = r.text
+            toolBusy = false
+        }
+    }
+
+    // ---------- YouTube & photo AI ----------
+    private fun openYouTubeSearchPage(q: String, speak: Boolean) {
+        if (AppLauncher.openYouTube(ctx, q)) {
+            logAction("YouTube search: $q")
+            reply("YouTube par '$q' ka search khol diya. Gaana aapko khud chunke play karna hoga. Seedha video ke liye Settings mein YouTube key daalo.", speak)
+        } else {
+            reply("YouTube ya browser nahi khul paya.", false, true)
+        }
+    }
+
+    private fun playOnYouTube(key: String, q: String, speak: Boolean) {
+        viewModelScope.launch {
+            val r = YouTubeClient.search(key, q)
+            if (r.videos.isEmpty()) {
+                if (r.error.isNotBlank()) notice = "YouTube API: " + r.error
+                openYouTubeSearchPage(q, speak)
+            } else {
+                ytResults = r.videos
+                val v = r.videos[0]
+                if (AppLauncher.openYouTubeVideo(ctx, v.id)) {
+                    logAction("YouTube: " + v.title)
+                    reply("'" + v.title + "' (" + v.channel + ") khol rahi hoon. Agar apne aap play na ho to play button dabao.", speak)
+                } else {
+                    reply("YouTube nahi khul paya.", false, true)
+                }
+            }
+        }
+    }
+
+    fun openVideo(v: YouTubeClient.Video) {
+        if (AppLauncher.openYouTubeVideo(ctx, v.id)) logAction("YouTube: " + v.title) else notice = "YouTube nahi khul paya."
+    }
+
+    fun saveYoutubeKey(k: String) {
+        val key = k.trim()
+        if (key.isEmpty()) { notice = "Pehle key daalo."; return }
+        if (!prefs.saveYoutubeKey(key)) { notice = "Key save nahi ho payi."; return }
+        hasYtKey = true
+        viewModelScope.launch {
+            val r = YouTubeClient.search(key, "music")
+            notice = if (r.videos.isNotEmpty()) "YouTube key kaam kar rahi hai." else "Key save hui, par test fail: " + r.error.take(100)
+        }
+    }
+
+    fun removeYoutubeKey() {
+        prefs.clearYoutubeKey()
+        hasYtKey = false
+        ytResults = emptyList()
+        notice = "YouTube key hata di."
+    }
+
+    fun askVision(jpeg: ByteArray, question: String) {
+        gateGemini()?.let { visionOutput = it; return }
+        val key = prefs.apiKey ?: return
+        toolBusy = true
+        visionOutput = ""
+        viewModelScope.launch {
+            val r = gemini.generateVision(
+                key, model,
+                Personas.toolSystem("Look at the user's photo and answer their question accurately. Say so if you cannot tell something.", language),
+                question.ifBlank { "Is photo mein kya hai?" }, jpeg
+            )
+            visionOutput = r.text
             toolBusy = false
         }
     }
@@ -682,6 +749,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         db.reminders().forEach { ReminderScheduler.cancel(ctx, it.id) }
         db.clearReminders()
         refreshReminders()
+        prefs.clearYoutubeKey()
+        hasYtKey = false
         prefs.clearApiKey()
         db.clearMemory()
         db.clearHistory()

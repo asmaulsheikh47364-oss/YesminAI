@@ -231,7 +231,11 @@ fun AppsScreen(vm: AppViewModel, nav: NavHostController) {
             OutlinedTextField(value = ytQuery, onValueChange = { ytQuery = it }, singleLine = true, modifier = Modifier.weight(1f), label = { Text("Gaana / video") })
             Button(onClick = { vm.openYouTubeSearch(ytQuery) }, enabled = ytQuery.isNotBlank()) { Text("Search") }
         }
-        Text("YouTube ka search khulta hai; gaana chunke play karna aapko padta hai.", style = MaterialTheme.typography.bodySmall)
+        Text(
+            if (vm.hasYtKey) "Pehla result seedha khulta hai; neeche baaki results se bhi chun sakte ho." else "Sirf YouTube ka search khulta hai. Seedha video ke liye Settings mein YouTube key daalo.",
+            style = MaterialTheme.typography.bodySmall
+        )
+        vm.ytResults.forEach { v -> TextButton(onClick = { vm.openVideo(v) }) { Text("▶ " + v.title.take(50) + " — " + v.channel.take(20)) } }
         Button(onClick = { nav.navigate("reminders") { launchSingleTop = true } }, modifier = Modifier.fillMaxWidth()) { Text("⏰ Set Reminder") }
         Button(onClick = { nav.navigate("messages") { launchSingleTop = true } }, modifier = Modifier.fillMaxWidth()) { Text("✉️ Send Message / Call / Messages padho") }
         Text("Call lagao", style = MaterialTheme.typography.titleSmall)
@@ -260,6 +264,7 @@ fun MoreScreen(nav: NavHostController) {
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Text("More", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        NavRow("📷", "Photo AI", "Photo dikhao aur sawaal poochho") { nav.navigate("vision") { launchSingleTop = true } }
         NavRow("✉️", "Messages & Call", "Message bhejo, call lagao, aaye message padho aur jawab do") { nav.navigate("messages") { launchSingleTop = true } }
         NavRow("⏰", "Reminders", "Yaad dilane wale alarm aur notifications") { nav.navigate("reminders") { launchSingleTop = true } }
         NavRow("🎭", "AI Personalities", "Yesmin, Zara, Riya, Aisha ya apni khud ki") { nav.navigate("profiles") { launchSingleTop = true } }

@@ -1,30 +1,22 @@
-# Feature status (honest)
-Legend: IMPLEMENTED = code written, UNTESTED = never compiled/run yet. Nothing here is verified on a device.
+# Yesmin AI — feature status (honest)
+Nothing here has been verified on a device by the author; the code is written by Claude and is checked only by the GitHub build and your phone.
 
-| Feature | Type | Status |
+| Area | What it does | Notes |
 |---|---|---|
-| 5-tab Compose UI, dark/light theme | Local | Implemented, untested |
-| Gemini key save (Keystore-encrypted), real connection test, model list from API | Gemini | Implemented, untested |
-| Model/temperature settings, sample test, clear error messages | Gemini | Implemented, untested |
-| Chat with personalities (4) + Hindi/Hinglish/English | Gemini | Implemented, untested |
-| Push-to-talk voice (SpeechRecognizer) + spoken replies (TextToSpeech), stop/cancel, text fallback | Local (+Gemini for answer) | Implemented, untested |
-| Voice choice list | Local | Implemented; female voice depends on installed TTS engine |
-| Open apps by name (ambiguity + not-installed handling) | Local | Implemented, untested |
-| YouTube search via URL/intent | Local | Implemented; opens search only, NO autoplay |
-| Battery, network, time/date, device info | Local | Implemented, untested |
-| Calculator | Local | Implemented, unit tests written |
-| Coding Assistant (generate/explain/bugs/error/tests/plan, copy + save snippet) | Gemini | Implemented, untested |
-| Translate, writing, summary, study/quiz, ideas, analysis, troubleshooting | Gemini | Implemented, untested |
-| Memory/notes/tasks (view, edit, delete, clear, disable), sensitive-text guard | Local | Implemented, untested |
-| Optional chat history (off by default) | Local | Implemented, untested |
-| Accessibility: back, home, scroll, tap by label, type text; confirmation for risky taps | Needs permission | Implemented, untested; runs 5s after command so you can switch apps |
-| Privacy notice, delete-everything controls | Local | Implemented, untested |
-| Unit tests (router, calculator, sensitive guard) | - | Written, not run |
+| Design | Neon theme, 5 tabs (Home, Chat, Voice, Apps, More), onboarding with permissions | |
+| Gemini brain | Key (Keystore-encrypted), real connection test, model list, temperature, retries on 503 | Needs internet + free quota |
+| Chat | Hindi/Hinglish/English, 4 modes, 4 personalities + custom, temporary chat | Messages go to Google Gemini |
+| Voice | Push-to-talk, live waveform, phone voice or Gemini natural voice with fallback | Female voice on phone depends on installed engine |
+| Phone control | Open apps, battery/network/device/storage/RAM/CPU, torch, volume, Wi-Fi/Bluetooth/DND panels, call (dialer), action history with undo | Android 10 does not let apps toggle Wi-Fi/Bluetooth; call and send are pressed by the user |
+| YouTube | Search page; with an optional YouTube Data API key the first video opens directly | Auto-play is decided by YouTube |
+| Messaging | Contacts lookup, WhatsApp/SMS draft opened with text ready, AI draft, read incoming messages and reply (Notification Access), confirm before reply | Messages stay in memory only |
+| Reminders | Real alarms + notifications, repeat, snooze, done, edit, boot restore, voice "10 minute baad ... yaad dilao" | Exact alarm permission may be needed on Android 12+ |
+| Memory | Categories, search, edit/delete, on/off, sensitive-text guard | Local only, no sync |
+| Security | PIN lock (salted PBKDF2), optional fingerprint, hide reminder text | Forgotten PIN = clear app data |
+| Photo AI | Gallery/camera photo + question via Gemini Vision | Photo sent to Google |
+| Tools | Coding assistant (6), translate, writing, summary, study, ideas, analysis, troubleshooting, calculator | |
+| Accessibility | Optional: back, home, scroll, tap by label, type; confirm for risky taps | Never reads passwords |
+| Help | FAQ and optional support number | |
 
 ## Not implemented
-Image understanding, reminders/alarms (tasks are just notes), wake-word, always-on listening, cross-device sync,
-running AI-generated code, Room/DataStore/DI (SQLite + SharedPreferences used instead), release signing config in Gradle.
-
-## Known limits
-- Accessibility cannot control password fields, system permission dialogs, or apps that block it.
-- Gemini model names change over time; the app lists models from Google after a successful key test.
+"Hey Yesmin" wake word, always-on listening, cross-device sync, running AI-generated code, reading screen content.

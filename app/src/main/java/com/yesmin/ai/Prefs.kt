@@ -62,6 +62,18 @@ class Prefs(ctx: Context) {
 
     fun clearApiKey() { sp.edit().remove("api_key").apply() }
 
+    val youtubeKey: String?
+        get() = sp.getString("yt_key", null)?.let { SecureStore.decrypt(it) }
+
+    fun saveYoutubeKey(k: String): Boolean = try {
+        sp.edit().putString("yt_key", SecureStore.encrypt(k)).apply()
+        true
+    } catch (e: Exception) {
+        false
+    }
+
+    fun clearYoutubeKey() { sp.edit().remove("yt_key").apply() }
+
     var model: String
         get() = sp.getString("model", "gemini-2.5-flash") ?: "gemini-2.5-flash"
         set(v) { sp.edit().putString("model", v).apply() }
