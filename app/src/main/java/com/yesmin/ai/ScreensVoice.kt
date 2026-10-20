@@ -344,31 +344,62 @@ fun SupportScreen(vm: AppViewModel) {
         "App kholne ka command nahi chal raha?" to "App ka naam wahi bolo jo icon ke neeche likha hai. Phone Control tab mein bhi naam likhkar khol sakte ho.",
         "Mic kaam nahi kar raha?" to "Settings → Permissions mein Microphone allow karo. Tab tak type karke bhi baat kar sakte ho."
     )
+
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        Text("Help & Support", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-        if (vm.supportNumber.isNotBlank()) {
-            Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("Contact Us", fontWeight = FontWeight.Bold)
-                    Text(vm.supportNumber, style = MaterialTheme.typography.bodySmall)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = { PhoneControl.dial(ctx, vm.supportNumber) }) { Text("📞 Call") }
-                        OutlinedButton(onClick = { PhoneControl.whatsapp(ctx, vm.supportNumber, "") }) { Text("WhatsApp") }
-                    }
+        Text(
+            "Help & Support",
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold
+        )
+
+        Card(Modifier.fillMaxWidth()) {
+            Column(
+                Modifier.fillMaxWidth().padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    "Creator Information",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    "Md Asmaul",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text("📍 Village: Bhawanipur")
+                Text("District: Pakur")
+                Text("Jharkhand, India")
+
+                Button(
+                    onClick = {
+                        PhoneControl.whatsapp(ctx, "9321109411", "")
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("💬  Contact on WhatsApp")
                 }
             }
         }
+
         faq.forEach { (q, a) ->
             Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(14.dp)) {
+                Column(
+                    Modifier.fillMaxWidth().padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
                     Text(q, fontWeight = FontWeight.Bold)
-                    Text(a, style = MaterialTheme.typography.bodySmall)
+                    Text(a, style = MaterialTheme.typography.bodyMedium)
                 }
             }
         }
-        Text("Yesmin AI personal prototype. Kaun si cheez kaam karti hai, FEATURES.md mein likha hai.", style = MaterialTheme.typography.bodySmall)
+
+        Text(
+            "Yesmin AI personal prototype. Kaun si cheez kaam karti hai, FEATURES.md mein likha hai.",
+            style = MaterialTheme.typography.bodySmall
+        )
     }
 }
