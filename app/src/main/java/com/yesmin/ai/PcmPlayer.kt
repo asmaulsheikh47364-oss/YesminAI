@@ -10,9 +10,10 @@ import android.os.Looper
 class PcmPlayer {
     private var track: AudioTrack? = null
 
-    fun play(pcm: ByteArray, onDone: () -> Unit) {
+    fun play(raw: ByteArray, onDone: () -> Unit) {
         stop()
-        if (pcm.size < 4) { onDone(); return }
+        if (raw.size < 4) { onDone(); return }
+        val pcm = clean(raw)
         val frames = pcm.size / 2
         val t = AudioTrack.Builder()
             .setAudioAttributes(
@@ -39,6 +40,31 @@ class PcmPlayer {
         }, Handler(Looper.getMainLooper()))
         track = t
         t.play()
+    }
+
+    /** Removes DC/rumble and fades the start and end to avoid clicks and hiss. */
+    private fun clean(src: ByteArray): ByteArray {
+        val n = src.size / 2
+        val y = FloatArray(n)
+        var px = 0f
+        var py = 0f
+        for (i in 0 until n) {
+            val v = ((src[2 * i + 1].toInt() shl 8) or (src[2 * i].toInt() and 0xFF)).toShort().toFloat()
+            py = v - px + 0.995f * py
+            px = v
+            y[i] = py
+        }
+        val fi = minOf(240, n / 2)
+        val fo = minOf(720, n / 2)
+        for (i in 0 until fi) y[i] *= i.toFloat() / fi
+        for (i in 0 until fo) y[n - 1 - i] *= i.toFloat() / fo
+        val out = ByteArray(n * 2)
+        for (i in 0 until n) {
+            val v = y[i].toInt().coerceIn(-32768, 32767)
+            out[2 * i] = (v and 0xFF).toByte()
+            out[2 * i + 1] = ((v shr 8) and 0xFF).toByte()
+        }
+        return out
     }
 
     fun stop() {

@@ -158,7 +158,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun changeTtsModel(v: String) { ttsModelName = v; prefs.ttsModel = v }
 
     private fun ttsModel(): String = ttsModelName.ifBlank {
-        models.firstOrNull { it.contains("tts") && !it.contains("lite") }
+        models.firstOrNull { it.contains("flash") && it.contains("tts") && !it.contains("lite") }
+            ?: models.firstOrNull { it.contains("tts") && !it.contains("lite") }
             ?: models.firstOrNull { it.contains("tts") }
             ?: "gemini-2.5-flash-preview-tts"
     }
@@ -179,12 +180,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     voiceState = VoiceState.Speaking
                     pcm.play(audio) { afterTurn() }
                 } else {
-                    notice = "Gemini awaaz nahi mili (" + r.text.take(80) + ") — phone ki awaaz se bol rahi hoon."
-                    phoneSpeak(text, if (previewing) p.pitch else voicePitch, if (previewing) p.rate else voiceRate)
+                    notice = "Gemini awaaz nahi mili (" + r.text.take(80) + ") — is baar awaaz nahi aayegi, jawab text mein hai."
+                    afterTurn()
                 }
             }
         } else {
-            phoneSpeak(text, if (previewing) p.pitch else voicePitch, if (previewing) p.rate else voiceRate)
+            afterTurn()
         }
     }
 
