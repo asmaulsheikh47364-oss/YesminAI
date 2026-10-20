@@ -34,6 +34,18 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import java.util.Locale
 
+fun BrainStatus.label(): String = when (this) {
+    BrainStatus.NotConnected -> "Not Configured"
+    BrainStatus.Connecting -> "Connecting"
+    BrainStatus.Connected -> "Connected"
+    BrainStatus.InvalidKey -> "Invalid API Key"
+    BrainStatus.QuotaExceeded -> "Quota Exceeded"
+    BrainStatus.RateLimited -> "Rate Limited"
+    BrainStatus.NetworkError -> "Network Error"
+    BrainStatus.ServiceUnavailable -> "Service Unavailable"
+    BrainStatus.Error -> "Error"
+}
+
 @Composable
 fun BrainScreen(vm: AppViewModel) {
     var key by remember { mutableStateOf("") }
@@ -51,10 +63,11 @@ fun BrainScreen(vm: AppViewModel) {
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("Active provider: Google Gemini", fontWeight = FontWeight.Bold)
-                val (label, color) = when (vm.brainStatus) {
-                    BrainStatus.Connected -> "● Connected" to Color(0xFF2E7D32)
-                    BrainStatus.Error -> "● Error" to Color(0xFFC62828)
-                    BrainStatus.NotConnected -> "● Not Connected" to Color(0xFF757575)
+                val label = "● " + vm.brainStatus.label()
+                val color = when (vm.brainStatus) {
+                    BrainStatus.Connected -> Color(0xFF2E7D32)
+                    BrainStatus.NotConnected, BrainStatus.Connecting -> Color(0xFF757575)
+                    else -> Color(0xFFC62828)
                 }
                 Text(label, color = color, fontWeight = FontWeight.Bold)
                 if (vm.brainMessage.isNotBlank()) Text(vm.brainMessage)
@@ -121,6 +134,26 @@ fun BrainScreen(vm: AppViewModel) {
                 Button(onClick = { vm.sampleTest(sample) }, enabled = !vm.busy && vm.hasKey) { Text("Gemini ko bhejo") }
                 if (vm.sampleReply.isNotBlank()) RichText(vm.sampleReply)
                 Text("Yeh message Google Gemini ko bheja jaata hai.", style = MaterialTheme.typography.bodySmall)
+            }
+        }
+
+        Card(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                var yk by remember { mutableStateOf("") }
+                Text("YouTube key (optional)", fontWeight = FontWeight.Bold)
+                Text("Status: " + if (vm.hasYtKey) "saved" else "nahi")
+                OutlinedTextField(
+                    value = yk, onValueChange = { yk = it }, singleLine = true, label = { Text("YouTube Data API key") },
+                    visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth()
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = { vm.saveYoutubeKey(yk); yk = "" }, enabled = yk.isNotBlank()) { Text("Save & Test") }
+                    OutlinedButton(onClick = { vm.removeYoutubeKey() }, enabled = vm.hasYtKey) { Text("Remove") }
+                }
+                Text(
+                    "YouTube kholne ke liye key ki zaroorat nahi. Yeh sirf tab chahiye jab 'YouTube par ... gaane' bolne par pehla video seedha kholna ho. Google Cloud Console mein YouTube Data API v3 enable karke key banao. Apne aap play hone ki gaarantee Google nahi deta.",
+                    style = MaterialTheme.typography.bodySmall
+                )
             }
         }
     }

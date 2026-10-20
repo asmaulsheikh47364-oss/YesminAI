@@ -67,6 +67,13 @@ class CommandRouterTest {
         assertEquals(Command.None, CommandRouter.parse("reply to this email politely"))
     }
 
+    @Test fun voiceControl() {
+        assertEquals(Command.Voice("pause"), CommandRouter.parse("pause"))
+        assertEquals(Command.Voice("stopspeak"), CommandRouter.parse("stop speaking"))
+        assertEquals(Command.Voice("resume"), CommandRouter.parse("resume jasmine"))
+        assertEquals(Command.Voice("stop"), CommandRouter.parse("jasmine stop listening"))
+    }
+
     @Test fun profileNamePrefix() {
         assertEquals(Command.OpenApp("youtube"), CommandRouter.parse("Zara youtube kholo"))
     }

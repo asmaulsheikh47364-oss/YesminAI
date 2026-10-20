@@ -10,7 +10,7 @@ import java.net.SocketTimeoutException
 import java.net.URL
 import java.net.UnknownHostException
 
-data class AiResult(val ok: Boolean, val text: String, val models: List<String> = emptyList(), val audio: ByteArray? = null)
+data class AiResult(val ok: Boolean, val text: String, val models: List<String> = emptyList(), val audio: ByteArray? = null, val code: Int = 0)
 
 /** Talks to the official Gemini REST API (v1beta). The API key is sent only in a header, never logged. */
 class GeminiClient {
@@ -19,7 +19,7 @@ class GeminiClient {
     suspend fun listModels(key: String): AiResult = withContext(Dispatchers.IO) {
         try {
             val (code, resp) = request("GET", "$base/models?pageSize=100", key, null)
-            if (code != 200) return@withContext AiResult(false, friendly(code, resp, null))
+            if (code != 200) return@withContext AiResult(false, friendly(code, resp, null), code = code)
             val arr = JSONObject(resp).optJSONArray("models") ?: JSONArray()
             val names = mutableListOf<String>()
             for (i in 0 until arr.length()) {
@@ -32,7 +32,7 @@ class GeminiClient {
             }
             AiResult(true, "Key valid hai. ${names.size} Gemini models mile.", names.sortedDescending())
         } catch (e: Exception) {
-            AiResult(false, netError(e))
+            AiResult(false, netError(e), code = -1)
         }
     }
 
@@ -61,7 +61,7 @@ class GeminiClient {
             }
             val code = r.first
             val resp = r.second
-            if (code != 200) return@withContext AiResult(false, friendly(code, resp, m))
+            if (code != 200) return@withContext AiResult(false, friendly(code, resp, m), code = code)
             val j = JSONObject(resp)
             val cands = j.optJSONArray("candidates")
             if (cands == null || cands.length() == 0) {
@@ -78,7 +78,7 @@ class GeminiClient {
             val out = sb.toString().trim()
             if (out.isEmpty()) AiResult(false, "Khaali jawab aaya.") else AiResult(true, out)
         } catch (e: Exception) {
-            AiResult(false, netError(e))
+            AiResult(false, netError(e), code = -1)
         }
     }
 
@@ -102,7 +102,7 @@ class GeminiClient {
                 delay(2000L * tries)
                 r = request("POST", "$base/models/$m:generateContent", key, body.toString())
             }
-            if (r.first != 200) return@withContext AiResult(false, friendly(r.first, r.second, m))
+            if (r.first != 200) return@withContext AiResult(false, friendly(r.first, r.second, m), code = r.first)
             val cands = JSONObject(r.second).optJSONArray("candidates")
             val ps = cands?.optJSONObject(0)?.optJSONObject("content")?.optJSONArray("parts")
             if (ps == null) return@withContext AiResult(false, "Gemini ne photo ka jawab nahi diya.")
@@ -111,7 +111,7 @@ class GeminiClient {
             val out = sb.toString().trim()
             if (out.isEmpty()) AiResult(false, "Khaali jawab aaya.") else AiResult(true, out)
         } catch (e: Exception) {
-            AiResult(false, netError(e))
+            AiResult(false, netError(e), code = -1)
         }
     }
 
@@ -134,7 +134,7 @@ class GeminiClient {
                 delay(2000L * tries)
                 r = request("POST", "$base/models/$m:generateContent", key, body.toString())
             }
-            if (r.first != 200) return@withContext AiResult(false, friendly(r.first, r.second, m))
+            if (r.first != 200) return@withContext AiResult(false, friendly(r.first, r.second, m), code = r.first)
             val parts = JSONObject(r.second).optJSONArray("candidates")?.optJSONObject(0)
                 ?.optJSONObject("content")?.optJSONArray("parts")
             var data: String? = null
@@ -147,7 +147,7 @@ class GeminiClient {
             if (data == null) return@withContext AiResult(false, "Awaaz ka data nahi aaya.")
             AiResult(true, "ok", audio = android.util.Base64.decode(data, android.util.Base64.DEFAULT))
         } catch (e: Exception) {
-            AiResult(false, netError(e))
+            AiResult(false, netError(e), code = -1)
         }
     }
 
@@ -179,7 +179,12 @@ class GeminiClient {
             code == 400 -> "Request galat gayi (400): ${msg.take(160)}"
             code == 401 || code == 403 -> "API key ko permission nahi hai ya key invalid hai ($code)."
             code == 404 -> "Model ${model ?: ""} available nahi hai. AI Brain mein doosra model chuno."
-            code == 429 -> "Quota ya rate limit khatam. Thodi der baad try karo ya model badlo."
+            code == 429 -> {
+                val retry = Regex("retry in ([0-9.]+)s", RegexOption.IGNORE_CASE).find(msg)?.groupValues?.get(1)?.toDoubleOrNull()?.toInt()
+                val daily = msg.contains("per day", true) || msg.contains("daily", true) || msg.contains("billing", true)
+                if (daily) "Aaj ki quota khatam ho gayi hai. Kal dobara try karo ya Google AI Studio mein plan/billing dekho."
+                else "Bahut tez requests (rate limit). ~" + (retry ?: 30) + " second baad try karo."
+            }
             code >= 500 -> "Gemini server par problem ($code). Baad mein try karo."
             else -> "Error $code: ${msg.take(160)}"
         }
@@ -195,11 +200,9 @@ class GeminiClient {
 object Personas {
     val names = listOf("Friendly Companion", "Professional Assistant", "Coding Expert", "Study Helper")
 
-    private fun languageRule(language: String) = when (language) {
-        "hindi" -> "Reply in Hindi using Devanagari script."
-        "english" -> "Reply in English."
-        else -> "Reply in Hinglish (Hindi written in Roman script, mixed naturally with simple English)."
-    }
+    private fun languageRule(language: String): String =
+        "Reply in the same language the user used: Hindi in Devanagari if they wrote Devanagari, " +
+            "Hinglish (Hindi in Roman letters) if they wrote Roman Hindi, English if they wrote English. If unsure, use simple Hinglish."
 
     private fun personaRule(persona: String) = when (persona) {
         "Professional Assistant" -> "Style: polite, precise, professional, structured."

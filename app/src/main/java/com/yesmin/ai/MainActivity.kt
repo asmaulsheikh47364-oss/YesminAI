@@ -2,12 +2,15 @@
 
 package com.yesmin.ai
 
+import android.content.Intent
 import android.os.Bundle
 import android.os.SystemClock
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
@@ -36,13 +39,29 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 
 class MainActivity : ComponentActivity() {
-    private val vm: AppViewModel by viewModels()
+    private val vm: AppViewModel get() = (application as YesminApp).vm
     private var stoppedAt = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         ReminderScheduler.createChannel(this)
         setContent { YesminRoot() }
+        handleIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIntent(intent)
+    }
+
+    private fun handleIntent(i: Intent?) {
+        if (i == null) return
+        i.getStringExtra("route")?.let { vm.openRoute = it }
+        if (i.getBooleanExtra("start_session", false)) {
+            vm.openRoute = "voice"
+            if (!(vm.lockEnabled && vm.locked)) vm.startSession()
+        }
     }
 
     override fun onStop() {
@@ -69,7 +88,7 @@ fun navTab(nav: NavHostController, route: String) {
 
 @Composable
 fun YesminRoot() {
-    val vm: AppViewModel = viewModel()
+    val vm = (LocalContext.current.applicationContext as YesminApp).vm
     val dark = when (vm.theme) {
         "dark" -> true
         "light" -> false
@@ -77,10 +96,13 @@ fun YesminRoot() {
     }
     var dismissed by remember { mutableStateOf(false) }
     YesminTheme(dark) {
-        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-            if (vm.lockEnabled && vm.locked) LockScreen(vm)
-            else if (vm.onboardingDone) MainScaffold(vm)
-            else OnboardingScreen(vm)
+        Box(Modifier.fillMaxSize()) {
+            Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                if (vm.lockEnabled && vm.locked) LockScreen(vm)
+                else if (vm.onboardingDone) MainScaffold(vm)
+                else OnboardingScreen(vm)
+            }
+            EdgeGlow(vm)
         }
         if (vm.onboardingDone && !vm.disclosure && !dismissed && !(vm.lockEnabled && vm.locked)) {
             AlertDialog(
@@ -105,6 +127,12 @@ fun MainScaffold(vm: AppViewModel) {
     val nav = rememberNavController()
     val route = nav.currentBackStackEntryAsState().value?.destination?.route
     val snack = remember { SnackbarHostState() }
+    LaunchedEffect(vm.openRoute) {
+        vm.openRoute?.let { r ->
+            navTab(nav, r)
+            vm.openRoute = null
+        }
+    }
     LaunchedEffect(vm.notice) {
         if (vm.notice.isNotBlank()) {
             snack.showSnackbar(vm.notice)

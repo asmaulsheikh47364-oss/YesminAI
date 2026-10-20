@@ -1,19 +1,23 @@
 package com.yesmin.ai
 
 import android.app.Application
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-enum class VoiceState { Idle, Listening, Thinking, Speaking, Error }
-enum class BrainStatus { NotConnected, Connected, Error }
+enum class VoiceState { Idle, Connecting, Listening, Processing, Speaking, Paused, Error }
+enum class BrainStatus { NotConnected, Connecting, Connected, InvalidKey, QuotaExceeded, RateLimited, NetworkError, ServiceUnavailable, Error }
 data class ChatMsg(val fromUser: Boolean, val text: String, val error: Boolean = false)
 data class Pending(val description: String, val action: A11yAction)
 data class PendingReply(val msg: IncomingMessage, val text: String)
@@ -66,6 +70,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var locked by mutableStateOf(prefs.lockEnabled)
     var supportNumber by mutableStateOf(prefs.supportNumber)
     var tempMode by mutableStateOf(false)
+    var sessionActive by mutableStateOf(false)
+    var sessionPaused by mutableStateOf(false)
+    var voiceSource by mutableStateOf("")
+    var openRoute by mutableStateOf<String?>(null)
+    private var silentFails = 0
+    private var listenJob: Job? = null
+    private var blockedUntil = 0L
     var visionOutput by mutableStateOf("")
     var hasYtKey by mutableStateOf(prefs.youtubeKey != null)
     var ytResults by mutableStateOf(listOf<YouTubeClient.Video>())
@@ -110,9 +121,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun voiceNames(): List<String> = voice.voices(language)
     fun statusLabel(): String = when (voiceState) {
         VoiceState.Idle -> "Ready"
+        VoiceState.Connecting -> "Jud rahi hoon…"
         VoiceState.Listening -> "Sun rahi hoon…"
-        VoiceState.Thinking -> "Soch rahi hoon…"
+        VoiceState.Processing -> "Soch rahi hoon…"
         VoiceState.Speaking -> "Bol rahi hoon…"
+        VoiceState.Paused -> "Paused — Resume dabao"
         VoiceState.Error -> "Error — details chat mein"
     }
 
@@ -157,13 +170,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private fun speakWith(text: String, p: Profile = activeProfile(), previewing: Boolean = false) {
         val key = prefs.apiKey
         if (voiceEngine == "gemini" && key != null && disclosure) {
-            voiceState = VoiceState.Thinking
+            voiceState = VoiceState.Processing
             viewModelScope.launch {
                 val r = gemini.speech(key, ttsModel(), p.geminiVoice, voice.speakable(text).take(1200))
                 val audio = r.audio
                 if (r.ok && audio != null) {
+                    voiceSource = "Gemini voice"
                     voiceState = VoiceState.Speaking
-                    pcm.play(audio) { voiceState = VoiceState.Idle }
+                    pcm.play(audio) { afterTurn() }
                 } else {
                     notice = "Gemini awaaz nahi mili (" + r.text.take(80) + ") — phone ki awaaz se bol rahi hoon."
                     phoneSpeak(text, if (previewing) p.pitch else voicePitch, if (previewing) p.rate else voiceRate)
@@ -175,9 +189,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun phoneSpeak(text: String, pitch: Float, rate: Float) {
-        val ok = voice.speak(text, language, voiceName, pitch, rate) { voiceState = VoiceState.Idle }
+        voiceSource = "Phone voice"
+        val ok = voice.speak(text, language, voiceName, pitch, rate) { afterTurn() }
         if (!ok) {
-            voiceState = VoiceState.Idle
             if (!ttsNoticeShown) {
                 ttsNoticeShown = true
                 messages.add(ChatMsg(false, "Is phone ke speech engine mein is bhasha ki awaaz nahi mili, isliye main bol nahi paa rahi. Settings → Voice se voice data install karo. Tab tak text mein jawab dungi.", true))
@@ -191,8 +205,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private fun reply(text: String, speak: Boolean, error: Boolean = false) {
         messages.add(ChatMsg(false, text, error))
         if (saveHistory && !error && !tempMode) db.addHistory(false, text)
-        if (error) { voiceState = VoiceState.Error; return }
-        if (speak) speakWith(text) else voiceState = VoiceState.Idle
+        if (error) {
+            if (sessionActive && !sessionPaused) afterTurn() else voiceState = VoiceState.Error
+            return
+        }
+        if (speak) speakWith(text) else afterTurn()
     }
 
     fun send(text: String, speak: Boolean) {
@@ -229,6 +246,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             Command.Network -> reply(PhoneInfo.network(ctx), speak)
             Command.DeviceInfo -> reply(PhoneInfo.device(), speak)
             is Command.Reminder -> createQuickReminder(cmd.title, cmd.minutes, speak)
+            is Command.Voice -> when {
+                cmd.action == "stopspeak" -> stopSpeaking()
+                !sessionActive -> reply("Abhi koi voice session chalu nahi hai. Voice tab mein mic dabao.", false)
+                cmd.action == "pause" -> { pauseSession(); reply("Pause kar diya. Resume ke liye Resume dabao.", false) }
+                cmd.action == "resume" -> resumeSession()
+                else -> { stopSession(); reply("Voice session band kar diya.", false) }
+            }
             is Command.Torch -> {
                 if (PhoneControl.torch(ctx, cmd.on)) {
                     val msg = if (cmd.on) "Torch on kar di." else "Torch band kar di."
@@ -301,7 +325,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         speakWith(text)
         delay(300)
         var waited = 0
-        while ((voiceState == VoiceState.Speaking || voiceState == VoiceState.Thinking) && waited < 4000) {
+        while ((voiceState == VoiceState.Speaking || voiceState == VoiceState.Processing) && waited < 4000) {
             delay(100)
             waited += 100
         }
@@ -340,7 +364,28 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    private fun statusFor(code: Int, text: String): BrainStatus = when {
+        code == -1 -> BrainStatus.NetworkError
+        code == 429 -> if (text.contains("Aaj ki quota", true)) BrainStatus.QuotaExceeded else BrainStatus.RateLimited
+        code >= 500 -> BrainStatus.ServiceUnavailable
+        code == 401 || code == 403 -> BrainStatus.InvalidKey
+        code == 400 && text.contains("API key", true) -> BrainStatus.InvalidKey
+        else -> BrainStatus.Error
+    }
+
+    /** Updates the connection status from a real API result and pauses new requests after a rate/quota error. */
+    private fun noteResult(r: AiResult) {
+        if (r.ok) { brainStatus = BrainStatus.Connected; return }
+        brainStatus = statusFor(r.code, r.text)
+        if (r.code == 429) {
+            val sec = Regex("~(\\d+) second").find(r.text)?.groupValues?.get(1)?.toLongOrNull() ?: 300L
+            blockedUntil = System.currentTimeMillis() + sec * 1000
+        }
+    }
+
     private fun gateGemini(): String? {
+        val wait = (blockedUntil - System.currentTimeMillis()) / 1000
+        if (wait > 0) return "Gemini ki limit ki wajah se abhi ruko: " + (wait + 1) + " second."
         if (prefs.apiKey == null) return "Pehle AI Brain screen mein Gemini API key daalo."
         if (!disclosure) return "Pehle Privacy notice accept karo (app dobara kholo ya Settings → Privacy). Local commands tab bhi chalte hain."
         return null
@@ -350,7 +395,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         gateGemini()?.let { reply(it, false, true); return }
         val key = prefs.apiKey ?: return
         busy = true
-        voiceState = VoiceState.Thinking
+        voiceState = VoiceState.Processing
         val hist = messages.filter { !it.error }.takeLast(12)
             .map { (if (it.fromUser) "user" else "model") to it.text }
             .dropWhile { it.first != "user" }
@@ -358,13 +403,108 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val r = gemini.generate(key, model, Personas.chatSystem(persona, language, mem, activeProfile().name, activeProfile().tone), hist, temperature)
             busy = false
+            noteResult(r)
             if (r.ok) reply(r.text, speak) else reply(r.text, false, true)
         }
     }
 
     fun speakText(text: String) { speakWith(text) }
 
-    fun stopSpeaking() { voice.stopSpeaking(); pcm.stop(); voiceState = VoiceState.Idle }
+    fun stopSpeaking() { voice.stopSpeaking(); pcm.stop(); afterTurn() }
+
+    // ---------- continuous voice session ----------
+    private fun afterTurn() {
+        voiceState = if (sessionActive && sessionPaused) VoiceState.Paused else VoiceState.Idle
+        if (sessionActive && !sessionPaused) scheduleListen()
+    }
+
+    private fun scheduleListen() {
+        listenJob?.cancel()
+        listenJob = viewModelScope.launch {
+            delay(700)
+            if (sessionActive && !sessionPaused && voiceState == VoiceState.Idle && !busy) beginListening()
+        }
+    }
+
+    private fun beginListening() {
+        pcm.stop()
+        voice.listen(
+            localeTag(),
+            onText = { silentFails = 0; voiceState = VoiceState.Idle; send(it, true) },
+            onFail = { msg -> onListenFail(msg) }
+        )
+    }
+
+    private fun onListenFail(msg: String) {
+        if (!sessionActive) {
+            messages.add(ChatMsg(false, msg, true))
+            voiceState = VoiceState.Error
+            return
+        }
+        val fatal = msg.contains("permission", true) || msg.contains("service nahi", true)
+        if (fatal) {
+            messages.add(ChatMsg(false, msg, true))
+            stopSession()
+            voiceState = VoiceState.Error
+            return
+        }
+        silentFails++
+        if (silentFails >= 6) {
+            pauseSession()
+            notice = "Kaafi der se kuch sunai nahi diya, isliye pause kar diya."
+            return
+        }
+        voiceState = VoiceState.Idle
+        scheduleListen()
+    }
+
+    fun startSession() {
+        if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            voiceDenied()
+            openRoute = "voice"
+            return
+        }
+        if (sessionActive && !sessionPaused) return
+        sessionActive = true
+        sessionPaused = false
+        silentFails = 0
+        try {
+            AssistantService.start(ctx)
+        } catch (e: Exception) {
+            notice = "Background service shuru nahi ho payi; app khula rahe tab tak session chalega."
+        }
+        voiceState = VoiceState.Connecting
+        speakWith(activeProfile().name + " taiyaar hai. Boliye.")
+    }
+
+    fun pauseSession() {
+        if (!sessionActive) return
+        sessionPaused = true
+        listenJob?.cancel()
+        voice.cancelListening()
+        voice.stopSpeaking()
+        pcm.stop()
+        voiceState = VoiceState.Paused
+    }
+
+    fun resumeSession() {
+        if (!sessionActive) { startSession(); return }
+        sessionPaused = false
+        silentFails = 0
+        voiceState = VoiceState.Idle
+        scheduleListen()
+    }
+
+    fun stopSession() {
+        sessionActive = false
+        sessionPaused = false
+        listenJob?.cancel()
+        voice.cancelListening()
+        voice.stopSpeaking()
+        pcm.stop()
+        voiceState = VoiceState.Idle
+        try { AssistantService.stop(ctx) } catch (e: Exception) {}
+    }
 
     fun startListening() {
         if (voiceState == VoiceState.Listening) { cancelListening(); return }
@@ -389,9 +529,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (newKey.isBlank()) { brainStatus = BrainStatus.Error; brainMessage = "Pehle API key daalo."; return }
         busy = true
         brainMessage = "Test ho raha hai…"
+        brainStatus = BrainStatus.Connecting
         viewModelScope.launch {
             val r = gemini.listModels(newKey)
-            if (!r.ok) { brainStatus = BrainStatus.Error; brainMessage = r.text; busy = false; return@launch }
+            if (!r.ok) { noteResult(r); brainMessage = r.text; busy = false; return@launch }
             if (!prefs.saveApiKey(newKey)) {
                 brainStatus = BrainStatus.Error
                 brainMessage = "Key secure storage mein save nahi ho payi."
@@ -410,9 +551,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (k == null) { brainStatus = BrainStatus.NotConnected; brainMessage = "Koi key saved nahi hai."; return }
         busy = true
         brainMessage = "Test ho raha hai…"
+        brainStatus = BrainStatus.Connecting
         viewModelScope.launch {
             val r = gemini.listModels(k)
-            if (r.ok) { models = r.models; generateTest(k) } else { brainStatus = BrainStatus.Error; brainMessage = r.text }
+            if (r.ok) { models = r.models; generateTest(k) } else { noteResult(r); brainMessage = r.text }
             busy = false
         }
     }
@@ -423,7 +565,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             brainStatus = BrainStatus.Connected
             brainMessage = "Gemini ($model) se asli jawab mila — Connected."
         } else {
-            brainStatus = BrainStatus.Error
+            noteResult(t)
             brainMessage = t.text
         }
     }

@@ -3,7 +3,10 @@
 package com.yesmin.ai
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.RepeatMode
@@ -103,24 +106,28 @@ private fun NavRow(icon: String, title: String, desc: String, onClick: () -> Uni
 @Composable
 fun VoiceScreen(vm: AppViewModel) {
     val ctx = LocalContext.current
+    var refresh by remember { mutableStateOf(0) }
+    val micOk = refresh >= 0 &&
+        ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
     val micLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) vm.startListening() else vm.voiceDenied()
+        refresh++
+        if (granted) vm.startSession() else vm.voiceDenied()
     }
     fun onMic() {
-        if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-            vm.startListening()
-        } else {
-            micLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        if (!micOk) { micLauncher.launch(Manifest.permission.RECORD_AUDIO); return }
+        when {
+            !vm.sessionActive -> vm.startSession()
+            vm.sessionPaused -> vm.resumeSession()
+            else -> vm.pauseSession()
         }
     }
     val pulse by rememberInfiniteTransition(label = "pulse").animateFloat(
         0.3f, 0.9f, infiniteRepeatable(tween(500), RepeatMode.Reverse), label = "pulseValue"
     )
-    val listening = vm.voiceState == VoiceState.Listening
     val level = when (vm.voiceState) {
         VoiceState.Listening -> vm.micLevel
         VoiceState.Speaking -> pulse
-        VoiceState.Thinking -> 0.15f
+        VoiceState.Processing, VoiceState.Connecting -> 0.15f
         else -> 0.03f
     }
     val lastUser = vm.messages.lastOrNull { it.fromUser }
@@ -138,20 +145,37 @@ fun VoiceScreen(vm: AppViewModel) {
         Box(
             Modifier.size(88.dp).clip(CircleShape).background(NeonBrush).clickable { onMic() },
             contentAlignment = Alignment.Center
-        ) { Text(if (listening) "⏹" else "🎤", fontSize = 36.sp) }
+        ) { Text(if (!vm.sessionActive) "🎤" else if (vm.sessionPaused) "▶" else "⏸", fontSize = 36.sp) }
         Text(
-            if (listening) "Bolo… rokne ke liye dobara dabao" else "Mic dabao aur bolo",
+            if (!vm.sessionActive) "Mic dabao — baat-cheet shuru. Yesmin baar-baar sunegi jab tak aap Pause ya Stop na karo."
+            else if (vm.sessionPaused) "Paused. Dobara shuru karne ke liye ▶ dabao."
+            else "Session chalu hai. Mic band karne ke liye ⏸ ya Stop dabao.",
             style = MaterialTheme.typography.bodySmall
         )
-        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            listOf("hindi" to "हिंदी", "hinglish" to "Hinglish", "english" to "English").forEach { (k, l) ->
-                FilterChip(selected = vm.language == k, onClick = { vm.changeLanguage(k) }, label = { Text(l) })
-            }
-        }
+        if (vm.voiceSource.isNotBlank()) Text("Awaaz: " + vm.voiceSource, style = MaterialTheme.typography.labelMedium)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (vm.sessionActive) OutlinedButton(onClick = { vm.stopSession() }) { Text("⏹ Stop session") }
             if (vm.voiceState == VoiceState.Speaking) OutlinedButton(onClick = { vm.stopSpeaking() }) { Text("Stop speaking") }
             if (lastReply != null && !lastReply.error) OutlinedButton(onClick = { vm.speakText(lastReply.text) }) { Text("🔊 Replay") }
         }
+        if (!micOk) {
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("Microphone ki ijazat nahi hai, isliye voice nahi chalegi. Text se Chat tab mein baat kar sakte ho.", style = MaterialTheme.typography.bodySmall)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = { micLauncher.launch(Manifest.permission.RECORD_AUDIO) }) { Text("Allow karo") }
+                        OutlinedButton(onClick = {
+                            ctx.startActivity(
+                                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + ctx.packageName))
+                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            )
+                            refresh++
+                        }) { Text("App Settings") }
+                    }
+                }
+            }
+        }
+        Text("Bolkar control: \"pause\", \"resume\", \"stop speaking\", \"stop listening\". Pause mein mic band rehta hai, isliye Resume button/notification se dabana padta hai.", style = MaterialTheme.typography.bodySmall)
         if (lastUser != null) {
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(14.dp)) {
@@ -163,7 +187,7 @@ fun VoiceScreen(vm: AppViewModel) {
         if (lastReply != null) {
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(14.dp)) {
-                    Text("Yesmin", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                    Text(vm.activeProfile().name, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                     RichText(lastReply.text, onSave = { vm.addMemory("snippet", it) })
                 }
             }

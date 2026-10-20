@@ -89,7 +89,7 @@ class VoiceManager(
         if (t == null || !ttsReady) { finished(); return false }
         val clean = speakable(raw)
         if (clean.isBlank()) { finished(); return true }
-        val loc = if (language == "english") Locale("en", "IN") else Locale("hi", "IN")
+        val loc = if (looksHindi(raw)) Locale("hi", "IN") else Locale("en", "IN")
         val res = t.setLanguage(loc)
         if (res == TextToSpeech.LANG_MISSING_DATA || res == TextToSpeech.LANG_NOT_SUPPORTED) { finished(); return false }
         if (voiceName != null) t.voices?.firstOrNull { it.name == voiceName }?.let { t.voice = it }
@@ -107,6 +107,17 @@ class VoiceManager(
     }
 
     fun stopSpeaking() { tts?.stop() }
+
+    /** Picks the speaking language from the reply itself (Devanagari or Roman Hindi words -> Hindi, otherwise English). */
+    private fun looksHindi(s: String): Boolean {
+        if (s.any { it in '\u0900'..'\u097F' }) return true
+        val words = setOf(
+            "hai", "hain", "hoon", "main", "mein", "aap", "kya", "nahi", "karo", "karna", "ka", "ke", "ki", "ko", "se", "par",
+            "tum", "mera", "meri", "hum", "kaise", "kyun", "theek", "accha", "acha", "bahut", "abhi", "aur", "yeh", "woh",
+            "bolo", "batao", "dijiye", "kijiye"
+        )
+        return s.lowercase().split(Regex("[^a-z]+")).count { it in words } >= 2
+    }
 
     fun voices(language: String): List<String> {
         val lang = if (language == "english") "en" else "hi"

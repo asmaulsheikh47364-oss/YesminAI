@@ -126,12 +126,12 @@ fun Bubble(m: ChatMsg, vm: AppViewModel) {
 fun HomeScreen(vm: AppViewModel, nav: NavHostController) {
     val ctx = LocalContext.current
     val micLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) { navTab(nav, "voice"); vm.startListening() } else vm.voiceDenied()
+        if (granted) { navTab(nav, "voice"); vm.startSession() } else vm.voiceDenied()
     }
     fun onMic() {
         if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
             navTab(nav, "voice")
-            vm.startListening()
+            vm.startSession()
         } else {
             micLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
@@ -170,11 +170,7 @@ fun HomeScreen(vm: AppViewModel, nav: NavHostController) {
         Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
         Text("Main " + vm.activeProfile().name + " hoon, aapki personal AI assistant. Aaj main kaise madad karoon?", style = MaterialTheme.typography.bodyMedium)
         Text(
-            "● " + vm.statusLabel() + "   ·   Gemini: " + when (vm.brainStatus) {
-                BrainStatus.Connected -> "Connected"
-                BrainStatus.Error -> "Error"
-                BrainStatus.NotConnected -> "Not tested"
-            },
+            "● " + vm.statusLabel() + "   ·   Gemini: " + vm.brainStatus.label(),
             style = MaterialTheme.typography.labelLarge
         )
         Box(

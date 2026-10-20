@@ -50,7 +50,6 @@ fun OnboardingScreen(vm: AppViewModel) {
     val perms = remember {
         buildList {
             add(Manifest.permission.RECORD_AUDIO)
-            add(Manifest.permission.READ_CONTACTS)
             if (Build.VERSION.SDK_INT >= 33) add("android.permission.POST_NOTIFICATIONS")
         }
     }
@@ -72,10 +71,9 @@ fun OnboardingScreen(vm: AppViewModel) {
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp)) {
                 Text("Ijazat (permissions)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                PermRow("🎤", "Microphone", "Aapki awaaz sunne ke liye. Sirf tab chalta hai jab aap mic dabate ho.")
-                PermRow("👥", "Contacts", "Naam se call/message ka number dhundhne ke liye.")
+                PermRow("🎤", "Microphone", "Aapki awaaz sunne ke liye. Voice session mein mic tab tak chalta hai jab tak aap Pause ya Stop na karo, aur notification mein hamesha dikhta hai.")
                 if (Build.VERSION.SDK_INT >= 33) PermRow("🔔", "Notifications", "Reminders aur alerts dikhane ke liye.")
-                Text("Messages padhne (Notification Access) aur screen control (Accessibility) Android khud Settings mein on karwata hai; uske button More → Messages aur Settings mein milenge.", style = MaterialTheme.typography.bodySmall)
+                Text("Contacts, Notification Access aur Accessibility tab maange jaate hain jab aap us feature ko pehli baar use karte ho. Mana kar do to bhi baaki app chalta rahega.", style = MaterialTheme.typography.bodySmall)
             }
         }
         Text(

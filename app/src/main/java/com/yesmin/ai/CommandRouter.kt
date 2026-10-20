@@ -26,6 +26,8 @@ sealed class Command {
     data class Dnd(val on: Boolean) : Command()
     object ReadMessages : Command()
     data class Reply(val text: String) : Command()
+    /** Voice session control: pause | resume | stop | stopspeak. */
+    data class Voice(val action: String) : Command()
     object Battery : Command()
     object Time : Command()
     object Network : Command()
@@ -46,7 +48,7 @@ object CommandRouter {
     private val typeRe = Regex("(?i)^(?:yesmin[, ]*)?type\\s+(.+)$")
 
     private val stop = setOf(
-        "yesmin", "youtube", "yt", "par", "pe", "mein", "me", "kholo", "khol", "do", "open", "search", "karo",
+        "yesmin", "jasmine", "jasmin", "yasmin", "youtube", "yt", "par", "pe", "mein", "me", "kholo", "khol", "do", "open", "search", "karo",
         "kar", "karna", "ke", "ka", "ki", "ko", "mera", "meri", "mere", "favorite", "favourite", "please", "plz",
         "song", "songs", "gaane", "gana", "gaana", "gane", "music", "sunao", "chalao", "play", "dikhao", "dhundo",
         "laga", "lagao", "on", "in", "for", "the", "a", "hai", "kya", "mujhe", "ek", "bhi",
@@ -59,7 +61,7 @@ object CommandRouter {
     )
     private val openWords = setOf("kholo", "khol", "open", "launch", "chalu", "start", "kholna", "खोलो", "खोल")
     private val filler = setOf(
-        "yesmin", "please", "plz", "ko", "app", "ek", "mujhe", "mera", "meri", "ka", "ki", "ke", "par", "pe",
+        "yesmin", "jasmine", "jasmin", "yasmin", "please", "plz", "ko", "app", "ek", "mujhe", "mera", "meri", "ka", "ki", "ke", "par", "pe",
         "mein", "me", "karo", "kar", "do", "the", "na", "zara"
     )
 
@@ -112,10 +114,17 @@ object CommandRouter {
         val text = input.trim()
         if (text.isEmpty()) return Command.None
         var t = tokens(text)
-        if (t.firstOrNull() in setOf("yesmin", "zara", "riya", "aisha")) t = t.drop(1)
+        if (t.firstOrNull() in setOf("yesmin", "zara", "riya", "aisha", "jasmine", "jasmin", "yasmin")) t = t.drop(1)
         if (t.isEmpty()) return Command.None
 
         a11y(text, t)?.let { return Command.A11y(it) }
+
+        if (t.size <= 5) {
+            if (t == listOf("stop") || ("stop" in t && "speaking" in t)) return Command.Voice("stopspeak")
+            if (t.any { it in setOf("pause", "ruko", "rukiye") } && t.none { it in setOf("video", "song", "music", "gaana", "gaane") }) return Command.Voice("pause")
+            if ("resume" in t || ("dobara" in t && "shuru" in t)) return Command.Voice("resume")
+            if (("stop" in t || "band" in t) && t.any { it in setOf("listening", "session") }) return Command.Voice("stop")
+        }
 
         calcRe.matchEntire(text)?.let { m ->
             val e = m.groupValues[1].trim()

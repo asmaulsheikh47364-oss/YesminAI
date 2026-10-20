@@ -111,15 +111,6 @@ fun SettingsScreen(vm: AppViewModel, nav: NavHostController) {
             Text("Yeh number sirf Help & Support mein Call/WhatsApp button ke liye hai. Khaali chhodo to buttons nahi dikhte.", style = MaterialTheme.typography.bodySmall)
         }
 
-        Section("Language") {
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                listOf("hindi" to "हिंदी", "hinglish" to "Hinglish", "english" to "English").forEach { (k, l) ->
-                    FilterChip(selected = vm.language == k, onClick = { vm.changeLanguage(k) }, label = { Text(l) })
-                }
-            }
-            Text("Bolne ki bhasha (speech recognition) bhi isi se set hoti hai.", style = MaterialTheme.typography.bodySmall)
-        }
-
         Section("Mode (jawab ka andaaz)") {
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Personas.names.forEach { n -> FilterChip(selected = vm.persona == n, onClick = { vm.changePersona(n) }, label = { Text(n) }) }
@@ -223,23 +214,6 @@ fun SettingsScreen(vm: AppViewModel, nav: NavHostController) {
                     )
                 }) { Text("App permissions") }
             }
-        }
-
-        Section("YouTube key (optional)") {
-            var yk by remember { mutableStateOf("") }
-            Text("Key status: " + if (vm.hasYtKey) "saved" else "nahi")
-            OutlinedTextField(
-                value = yk, onValueChange = { yk = it }, singleLine = true, label = { Text("YouTube Data API key") },
-                visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth()
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { vm.saveYoutubeKey(yk); yk = "" }, enabled = yk.isNotBlank()) { Text("Save & Test") }
-                OutlinedButton(onClick = { vm.removeYoutubeKey() }, enabled = vm.hasYtKey) { Text("Remove") }
-            }
-            Text(
-                "Is key se 'YouTube par ... gaane' bolne par pehla video seedha khulta hai. Key ke liye Google Cloud Console mein YouTube Data API v3 enable karke API key banao. Bina key ke sirf search page khulta hai. Apne aap play hone ki gaarantee Google nahi deta.",
-                style = MaterialTheme.typography.bodySmall
-            )
         }
 
         Section("App Lock") {

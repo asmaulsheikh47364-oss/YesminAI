@@ -117,7 +117,7 @@ class Prefs(ctx: Context) {
         set(v) { sp.edit().putString("custom_tone", v).apply() }
     /** phone | gemini */
     var voiceEngine: String
-        get() = sp.getString("voice_engine", "phone") ?: "phone"
+        get() = sp.getString("voice_engine", "gemini") ?: "gemini"
         set(v) { sp.edit().putString("voice_engine", v).apply() }
     var ttsModel: String
         get() = sp.getString("tts_model", "") ?: ""
