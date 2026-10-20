@@ -5,6 +5,7 @@ package com.yesmin.ai
 import android.content.Intent
 import android.os.Bundle
 import android.os.SystemClock
+import androidx.core.view.WindowCompat
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -45,6 +47,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         ReminderScheduler.createChannel(this)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        window.statusBarColor = android.graphics.Color.TRANSPARENT
+        window.navigationBarColor = android.graphics.Color.TRANSPARENT
         setContent { YesminRoot() }
         handleIntent(intent)
     }
@@ -98,9 +103,11 @@ fun YesminRoot() {
     YesminTheme(dark) {
         Box(Modifier.fillMaxSize()) {
             Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                if (vm.lockEnabled && vm.locked) LockScreen(vm)
-                else if (vm.onboardingDone) MainScaffold(vm)
-                else OnboardingScreen(vm)
+                Box(Modifier.fillMaxSize().statusBarsPadding()) {
+                    if (vm.lockEnabled && vm.locked) LockScreen(vm)
+                    else if (vm.onboardingDone) MainScaffold(vm)
+                    else OnboardingScreen(vm)
+                }
             }
             EdgeGlow(vm)
         }

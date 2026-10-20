@@ -2,6 +2,7 @@ package com.yesmin.ai
 
 import android.content.Context
 import android.content.Intent
+import android.media.AudioManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -21,6 +22,24 @@ class VoiceManager(
     private var recognizer: SpeechRecognizer? = null
     private var tts: TextToSpeech? = null
     @Volatile private var ttsReady = false
+
+    private val audio = ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    private var muted = false
+    private val beepStreams = intArrayOf(AudioManager.STREAM_MUSIC, AudioManager.STREAM_NOTIFICATION, AudioManager.STREAM_SYSTEM)
+    private val unmuteRunnable = Runnable { unmuteBeep() }
+
+    private fun muteBeep() {
+        main.removeCallbacks(unmuteRunnable)
+        if (muted) return
+        muted = true
+        for (st in beepStreams) { try { audio.adjustStreamVolume(st, AudioManager.ADJUST_MUTE, 0) } catch (e: Exception) {} }
+    }
+
+    private fun unmuteBeep() {
+        if (!muted) return
+        muted = false
+        for (st in beepStreams) { try { audio.adjustStreamVolume(st, AudioManager.ADJUST_UNMUTE, 0) } catch (e: Exception) {} }
+    }
 
     init {
         tts = TextToSpeech(ctx) { status -> ttsReady = status == TextToSpeech.SUCCESS }
@@ -61,6 +80,7 @@ class VoiceManager(
             .putExtra(RecognizerIntent.EXTRA_LANGUAGE, localeTag)
             .putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
         onState(VoiceState.Listening)
+        muteBeep()
         r.startListening(i)
     }
 
@@ -72,6 +92,7 @@ class VoiceManager(
         try { recognizer?.cancel() } catch (e: Exception) {}
         try { recognizer?.destroy() } catch (e: Exception) {}
         recognizer = null
+        main.postDelayed(unmuteRunnable, 400)
         onLevel(0f)
     }
 
