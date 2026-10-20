@@ -499,7 +499,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         voiceState = VoiceState.Connecting
         viewModelScope.launch {
             val all = gemini.liveModels(key).filter { !it.contains("translate", true) }
-            val m = all.firstOrNull { it.contains("live", true) } ?: all.firstOrNull()
+            val m = all.firstOrNull { it.contains("live", true) && !it.contains("thinking", true) }
+                ?: all.firstOrNull { it.contains("live", true) } ?: all.firstOrNull()
             if (m == null) {
                 messages.add(ChatMsg(false, "Is API key par Live voice model nahi mila.", true))
                 stopSession()

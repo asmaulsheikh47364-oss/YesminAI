@@ -99,6 +99,7 @@ class LiveVoice(
         val gen = JSONObject()
             .put("responseModalities", JSONArray().put("AUDIO"))
             .put("speechConfig", JSONObject().put("voiceConfig", voice))
+        if (model.contains("thinking", true)) gen.put("thinkingConfig", JSONObject().put("thinkingLevel", "LOW"))
         val setup = JSONObject()
             .put("model", "models/$model")
             .put("generationConfig", gen)
