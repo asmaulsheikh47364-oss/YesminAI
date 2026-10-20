@@ -1,0 +1,242 @@
+package com.yesmin.ai
+
+import android.annotation.SuppressLint
+import android.media.AudioAttributes
+import android.media.AudioFormat
+import android.media.AudioRecord
+import android.media.AudioTrack
+import android.media.MediaRecorder
+import android.os.Handler
+import android.os.Looper
+import android.util.Base64
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.Response
+import okhttp3.WebSocket
+import okhttp3.WebSocketListener
+import okio.ByteString
+import org.json.JSONArray
+import org.json.JSONObject
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.TimeUnit
+
+/** Real-time voice chat over the Gemini Live API: 16 kHz mic in, 24 kHz voice out. */
+class LiveVoice(
+    private val onState: (VoiceState) -> Unit,
+    private val onUserText: (String) -> Unit,
+    private val onModelText: (String) -> Unit,
+    private val onLevel: (Float) -> Unit,
+    private val onError: (String) -> Unit
+) {
+    private val ui = Handler(Looper.getMainLooper())
+    private val http = OkHttpClient.Builder()
+        .readTimeout(0, TimeUnit.MILLISECONDS)
+        .pingInterval(20, TimeUnit.SECONDS)
+        .build()
+
+    private var ws: WebSocket? = null
+    private var rec: AudioRecord? = null
+    private var track: AudioTrack? = null
+    private val q = LinkedBlockingQueue<ByteArray>()
+    private val userBuf = StringBuilder()
+    private val modelBuf = StringBuilder()
+
+    @Volatile private var running = false
+    @Volatile private var ready = false
+    @Volatile var muted = false
+    @Volatile private var lastAudioMs = 0L
+
+    val isRunning: Boolean get() = running
+
+    private fun post(f: () -> Unit) { ui.post { f() } }
+
+    fun start(key: String, model: String, system: String, voiceName: String) {
+        if (running) return
+        running = true
+        ready = false
+        muted = false
+        q.clear()
+        userBuf.setLength(0)
+        modelBuf.setLength(0)
+        post { onState(VoiceState.Connecting) }
+        val url = "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=$key"
+        ws = http.newWebSocket(Request.Builder().url(url).build(), object : WebSocketListener() {
+            override fun onOpen(webSocket: WebSocket, response: Response) {
+                webSocket.send(setupJson(model, system, voiceName))
+            }
+            override fun onMessage(webSocket: WebSocket, text: String) { handle(text) }
+            override fun onMessage(webSocket: WebSocket, bytes: ByteString) { handle(bytes.utf8()) }
+            override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+                webSocket.close(1000, null)
+                if (running) fail(closeText(code, reason))
+            }
+            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                if (running) fail(failText(response?.code))
+            }
+        })
+    }
+
+    private fun fail(msg: String) {
+        stop()
+        post { onError(msg) }
+    }
+
+    private fun closeText(code: Int, reason: String): String {
+        val r = reason.lowercase()
+        return if (r.contains("quota") || r.contains("exhaust") || r.contains("limit") || r.contains("429"))
+            "Gemini ki limit khatam ho gayi hai, thodi der baad try karo."
+        else "Live connection band ho gaya ($code). " + reason.take(100)
+    }
+
+    private fun failText(code: Int?): String = when (code) {
+        429 -> "Gemini ki limit khatam ho gayi hai, thodi der baad try karo."
+        400, 401, 403 -> "API key ya Live model ki permission mein dikkat hai (code $code)."
+        else -> "Internet ya Live connection mein dikkat hai."
+    }
+
+    private fun setupJson(model: String, system: String, voiceName: String): String {
+        val voice = JSONObject().put("prebuiltVoiceConfig", JSONObject().put("voiceName", voiceName))
+        val gen = JSONObject()
+            .put("responseModalities", JSONArray().put("AUDIO"))
+            .put("speechConfig", JSONObject().put("voiceConfig", voice))
+        val setup = JSONObject()
+            .put("model", "models/$model")
+            .put("generationConfig", gen)
+            .put("systemInstruction", JSONObject().put("parts", JSONArray().put(JSONObject().put("text", system))))
+            .put("inputAudioTranscription", JSONObject())
+            .put("outputAudioTranscription", JSONObject())
+        return JSONObject().put("setup", setup).toString()
+    }
+
+    private fun handle(text: String) {
+        val j = try { JSONObject(text) } catch (e: Exception) { return }
+        if (j.has("setupComplete")) {
+            ready = true
+            startPlayer()
+            startMic()
+            post { onState(VoiceState.Listening) }
+            return
+        }
+        val sc = j.optJSONObject("serverContent") ?: return
+        val parts = sc.optJSONObject("modelTurn")?.optJSONArray("parts")
+        if (parts != null) {
+            for (i in 0 until parts.length()) {
+                val d = parts.optJSONObject(i)?.optJSONObject("inlineData")?.optString("data")
+                if (!d.isNullOrEmpty()) {
+                    lastAudioMs = System.currentTimeMillis()
+                    q.offer(Base64.decode(d, Base64.DEFAULT))
+                    post { onState(VoiceState.Speaking) }
+                }
+            }
+        }
+        sc.optJSONObject("inputTranscription")?.optString("text")?.let { userBuf.append(it) }
+        sc.optJSONObject("outputTranscription")?.optString("text")?.let { modelBuf.append(it) }
+        if (sc.optBoolean("interrupted")) {
+            q.clear()
+            try { track?.pause(); track?.flush(); track?.play() } catch (e: Exception) {}
+        }
+        if (sc.optBoolean("turnComplete") || sc.optBoolean("interrupted")) {
+            val u = userBuf.toString().trim()
+            val m = modelBuf.toString().trim()
+            userBuf.setLength(0)
+            modelBuf.setLength(0)
+            post {
+                if (u.isNotEmpty()) onUserText(u)
+                if (m.isNotEmpty()) onModelText(m)
+                onState(VoiceState.Listening)
+            }
+        }
+    }
+
+    private fun startPlayer() {
+        val min = AudioTrack.getMinBufferSize(24000, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT)
+        val t = AudioTrack.Builder()
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                    .build()
+            )
+            .setAudioFormat(
+                AudioFormat.Builder()
+                    .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                    .setSampleRate(24000)
+                    .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                    .build()
+            )
+            .setBufferSizeInBytes(maxOf(min, 24000))
+            .setTransferMode(AudioTrack.MODE_STREAM)
+            .build()
+        track = t
+        t.play()
+        Thread {
+            while (running) {
+                val b: ByteArray = (try { q.poll(100, TimeUnit.MILLISECONDS) } catch (e: InterruptedException) { null }) ?: continue
+                lastAudioMs = System.currentTimeMillis()
+                try { t.write(b, 0, b.size) } catch (e: Exception) {}
+                lastAudioMs = System.currentTimeMillis()
+            }
+        }.also { it.isDaemon = true }.start()
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun startMic() {
+        if (rec != null) return
+        val min = AudioRecord.getMinBufferSize(16000, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
+        val r = AudioRecord(
+            MediaRecorder.AudioSource.MIC, 16000,
+            AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, maxOf(min, 3200) * 2
+        )
+        if (r.state != AudioRecord.STATE_INITIALIZED) {
+            fail("Mic shuru nahi ho paaya.")
+            return
+        }
+        rec = r
+        r.startRecording()
+        Thread {
+            val buf = ByteArray(1280)
+            while (running) {
+                val n = r.read(buf, 0, buf.size)
+                if (n < 0) break
+                if (n == 0) continue
+                var sum = 0.0
+                var i = 0
+                while (i + 1 < n) {
+                    val s = ((buf[i + 1].toInt() shl 8) or (buf[i].toInt() and 0xFF)).toShort().toInt()
+                    sum += s.toDouble() * s
+                    i += 2
+                }
+                val rms = Math.sqrt(sum / (n / 2).coerceAtLeast(1)).toFloat()
+                val lv = (rms / 4000f).coerceIn(0f, 1f)
+                post { onLevel(lv) }
+                val busy = muted || !ready || !q.isEmpty() || System.currentTimeMillis() - lastAudioMs < 900
+                if (busy) continue
+                val msg = JSONObject().put(
+                    "realtimeInput",
+                    JSONObject().put(
+                        "audio",
+                        JSONObject()
+                            .put("data", Base64.encodeToString(buf, 0, n, Base64.NO_WRAP))
+                            .put("mimeType", "audio/pcm;rate=16000")
+                    )
+                )
+                ws?.send(msg.toString())
+            }
+        }.also { it.isDaemon = true }.start()
+    }
+
+    fun stop() {
+        running = false
+        ready = false
+        try { ws?.close(1000, "bye") } catch (e: Exception) {}
+        ws = null
+        try { rec?.stop() } catch (e: Exception) {}
+        try { rec?.release() } catch (e: Exception) {}
+        rec = null
+        try { track?.stop() } catch (e: Exception) {}
+        try { track?.release() } catch (e: Exception) {}
+        track = null
+        q.clear()
+        post { onLevel(0f) }
+    }
+}

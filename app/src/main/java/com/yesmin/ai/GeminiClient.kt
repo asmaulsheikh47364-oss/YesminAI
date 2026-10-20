@@ -36,6 +36,27 @@ class GeminiClient {
         }
     }
 
+    /** Models that support the Live (bidirectional audio) API, newest first. */
+    suspend fun liveModels(key: String): List<String> = withContext(Dispatchers.IO) {
+        try {
+            val (code, resp) = request("GET", "$base/models?pageSize=200", key, null)
+            if (code != 200) return@withContext emptyList<String>()
+            val arr = JSONObject(resp).optJSONArray("models") ?: JSONArray()
+            val names = mutableListOf<String>()
+            for (i in 0 until arr.length()) {
+                val m = arr.getJSONObject(i)
+                val methods = m.optJSONArray("supportedGenerationMethods") ?: continue
+                var live = false
+                for (j in 0 until methods.length()) if (methods.getString(j) == "bidiGenerateContent") live = true
+                val n = m.optString("name").removePrefix("models/")
+                if (live && n.startsWith("gemini")) names.add(n)
+            }
+            names.sortedDescending()
+        } catch (e: Exception) {
+            emptyList<String>()
+        }
+    }
+
     /** history = list of (role, text) where role is "user" or "model". */
     suspend fun generate(
         key: String, model: String, system: String,

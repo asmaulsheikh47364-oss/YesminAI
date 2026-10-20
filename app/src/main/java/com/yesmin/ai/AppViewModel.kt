@@ -88,6 +88,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private var ttsNoticeShown = false
     private var lastUserText = ""
     private val pcm = PcmPlayer()
+    private var live: LiveVoice? = null
 
     init {
         refreshMemories()
@@ -420,6 +421,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun scheduleListen() {
+        if (live != null) return
         listenJob?.cancel()
         listenJob = viewModelScope.launch {
             delay(700)
@@ -475,12 +477,59 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             notice = "Background service shuru nahi ho payi; app khula rahe tab tak session chalega."
         }
         voiceState = VoiceState.Connecting
-        speakWith(activeProfile().name + " taiyaar hai. Boliye.")
+        startLive()
+    }
+
+    private fun startLive() {
+        val key = prefs.apiKey
+        if (key == null) {
+            messages.add(ChatMsg(false, "Pehle API key daalo.", true))
+            stopSession()
+            return
+        }
+        gateGemini()?.let {
+            messages.add(ChatMsg(false, it, true))
+            stopSession()
+            return
+        }
+        val p = activeProfile()
+        val mem = if (memoryEnabled && !tempMode) memories.filter { it.category != "snippet" }.take(30).map { it.text } else emptyList()
+        val system = Personas.chatSystem(persona, language, mem, p.name, p.tone) +
+            " This is a live voice call: reply in short spoken sentences, no markdown, no lists."
+        voiceState = VoiceState.Connecting
+        viewModelScope.launch {
+            val all = gemini.liveModels(key).filter { !it.contains("translate", true) }
+            val m = all.firstOrNull { it.contains("live", true) } ?: all.firstOrNull()
+            if (m == null) {
+                messages.add(ChatMsg(false, "Is API key par Live voice model nahi mila.", true))
+                stopSession()
+                voiceState = VoiceState.Error
+                return@launch
+            }
+            if (!sessionActive || sessionPaused) return@launch
+            live?.stop()
+            val lv = LiveVoice(
+                onState = { if (sessionActive && !sessionPaused) voiceState = it },
+                onUserText = { messages.add(ChatMsg(true, it)) },
+                onModelText = { messages.add(ChatMsg(false, it)) },
+                onLevel = { },
+                onError = { msg ->
+                    messages.add(ChatMsg(false, msg, true))
+                    stopSession()
+                    voiceState = VoiceState.Error
+                }
+            )
+            live = lv
+            voiceSource = "Gemini Live"
+            lv.start(key, m, system, p.geminiVoice)
+        }
     }
 
     fun pauseSession() {
         if (!sessionActive) return
         sessionPaused = true
+        live?.stop()
+        live = null
         listenJob?.cancel()
         voice.cancelListening()
         voice.stopSpeaking()
@@ -492,11 +541,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (!sessionActive) { startSession(); return }
         sessionPaused = false
         silentFails = 0
-        voiceState = VoiceState.Idle
-        scheduleListen()
+        voiceState = VoiceState.Connecting
+        startLive()
     }
 
     fun stopSession() {
+        live?.stop()
+        live = null
         sessionActive = false
         sessionPaused = false
         listenJob?.cancel()
