@@ -57,7 +57,8 @@ class AssistantService : Service() {
         }
         if (watcher == null) {
             watcher = scope.launch {
-                snapshotFlow { Triple(vm.sessionActive, vm.sessionPaused, vm.voiceState) }.collect {
+                snapshotFlow { listOf<Any>(vm.sessionActive, vm.sessionPaused, vm.voiceState, AppVisibility.inForeground.value) }.collect {
+                    glowUpdate(vm)
                     if (!vm.sessionActive) {
                         stopSelf()
                     } else {
@@ -70,8 +71,22 @@ class AssistantService : Service() {
     }
 
     override fun onDestroy() {
+        GlowOverlay.hide(this)
         scope.cancel()
         super.onDestroy()
+    }
+
+    private fun glowUpdate(vm: AppViewModel) {
+        val show = vm.sessionActive && !AppVisibility.inForeground.value
+        val color = when (vm.voiceState) {
+            VoiceState.Listening -> 0xFF3B82F6.toInt()
+            VoiceState.Processing -> 0xFFF59E0B.toInt()
+            VoiceState.Speaking -> 0xFFEC4899.toInt()
+            VoiceState.Paused -> 0xFF64748B.toInt()
+            VoiceState.Error -> 0xFFEF4444.toInt()
+            else -> 0xFF3B82F6.toInt()
+        }
+        GlowOverlay.update(this, show, color, if (vm.voiceState == VoiceState.Paused) 0.25f else 0.95f)
     }
 
     private fun build(vm: AppViewModel): Notification {

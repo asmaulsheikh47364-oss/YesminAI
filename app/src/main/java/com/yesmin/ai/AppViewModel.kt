@@ -89,6 +89,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private var lastUserText = ""
     private val pcm = PcmPlayer()
     private var live: LiveVoice? = null
+    private var overlayAsked = false
 
     init {
         refreshMemories()
@@ -468,6 +469,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             return
         }
         if (sessionActive && !sessionPaused) return
+        if (!GlowOverlay.canShow(ctx) && !overlayAsked) {
+            overlayAsked = true
+            notice = "Background mein light dikhane ke liye 'Display over other apps' allow karo."
+            try {
+                ctx.startActivity(
+                    android.content.Intent(
+                        android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        android.net.Uri.parse("package:" + ctx.packageName)
+                    ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+            } catch (e: Exception) {
+            }
+        }
         sessionActive = true
         sessionPaused = false
         silentFails = 0

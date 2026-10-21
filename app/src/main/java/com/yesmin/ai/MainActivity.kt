@@ -71,11 +71,13 @@ class MainActivity : ComponentActivity() {
 
     override fun onStop() {
         super.onStop()
+        AppVisibility.inForeground.value = false
         stoppedAt = SystemClock.elapsedRealtime()
     }
 
     override fun onStart() {
         super.onStart()
+        AppVisibility.inForeground.value = true
         if (vm.lockEnabled && stoppedAt > 0 && SystemClock.elapsedRealtime() - stoppedAt > 30_000L) vm.locked = true
     }
 }
