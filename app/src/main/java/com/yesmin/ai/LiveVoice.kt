@@ -106,6 +106,11 @@ class LiveVoice(
             .put("systemInstruction", JSONObject().put("parts", JSONArray().put(JSONObject().put("text", system))))
             .put("inputAudioTranscription", JSONObject())
             .put("outputAudioTranscription", JSONObject())
+            .put("tools", JSONArray()
+                .put(JSONObject().put("googleSearch", JSONObject()))
+                .put(JSONObject().put("functionDeclarations", JSONArray().put(
+                    JSONObject().put("name", "get_current_time")
+                        .put("description", "Returns the exact current date and time in India (IST). Call it every time the user asks the time or date.")))))
         return JSONObject().put("setup", setup).toString()
     }
 
@@ -116,6 +121,21 @@ class LiveVoice(
             startPlayer()
             startMic()
             post { onState(VoiceState.Listening) }
+            return
+        }
+        j.optJSONObject("toolCall")?.let { tc ->
+            val calls = tc.optJSONArray("functionCalls")
+            if (calls != null) {
+                val resp = JSONArray()
+                for (i in 0 until calls.length()) {
+                    val c = calls.getJSONObject(i)
+                    val f = java.text.SimpleDateFormat("EEEE, d MMMM yyyy, h:mm a", java.util.Locale.ENGLISH)
+                    f.timeZone = java.util.TimeZone.getTimeZone("Asia/Kolkata")
+                    resp.put(JSONObject().put("id", c.optString("id")).put("name", c.optString("name"))
+                        .put("response", JSONObject().put("result", f.format(java.util.Date()) + " IST")))
+                }
+                ws?.send(JSONObject().put("toolResponse", JSONObject().put("functionResponses", resp)).toString())
+            }
             return
         }
         val sc = j.optJSONObject("serverContent") ?: return

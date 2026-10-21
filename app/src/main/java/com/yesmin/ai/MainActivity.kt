@@ -48,6 +48,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         ReminderScheduler.createChannel(this)
         WindowCompat.setDecorFitsSystemWindows(window, false)
+        window.navigationBarColor = android.graphics.Color.TRANSPARENT
+        if (android.os.Build.VERSION.SDK_INT >= 29) window.isNavigationBarContrastEnforced = false
         window.statusBarColor = android.graphics.Color.TRANSPARENT
         window.navigationBarColor = android.graphics.Color.TRANSPARENT
         setContent { YesminRoot() }

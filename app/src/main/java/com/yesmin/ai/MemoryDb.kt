@@ -59,6 +59,10 @@ class MemoryDb(ctx: Context) : SQLiteOpenHelper(ctx, "yesmin.db", null, 2) {
 
     fun clearMemory() { try { writableDatabase.delete("memory", null, null) } catch (e: Exception) {} }
 
+    fun pruneHistory(days: Int) {
+        try { writableDatabase.delete("history", "ts < ?", arrayOf((System.currentTimeMillis() - days * 86400000L).toString())) } catch (e: Exception) {}
+    }
+
     fun addHistory(fromUser: Boolean, text: String) {
         try {
             val v = ContentValues().apply {

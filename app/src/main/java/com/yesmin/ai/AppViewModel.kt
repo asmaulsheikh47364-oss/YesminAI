@@ -94,7 +94,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     init {
         refreshMemories()
         refreshReminders()
-        if (prefs.saveHistory) messages.addAll(db.history(50))
+        if (prefs.saveHistory) { db.pruneHistory(30); messages.addAll(db.history(100)) }
     }
 
     override fun onCleared() { voice.shutdown(); pcm.stop() }
@@ -494,6 +494,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         startLive()
     }
 
+    private val liveLog = ArrayList<ChatMsg>()
+
     private fun startLive() {
         val key = prefs.apiKey
         if (key == null) {
@@ -525,8 +527,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             live?.stop()
             val lv = LiveVoice(
                 onState = { if (sessionActive && !sessionPaused) voiceState = it },
-                onUserText = { messages.add(ChatMsg(true, it)); if (saveHistory && !tempMode) db.addHistory(true, it) },
-                onModelText = { messages.add(ChatMsg(false, it)); if (saveHistory && !tempMode) db.addHistory(false, it); autoRemember() },
+                onUserText = { liveLog.add(ChatMsg(true, it)); if (liveLog.size > 200) liveLog.removeAt(0) },
+                onModelText = { liveLog.add(ChatMsg(false, it)); if (liveLog.size > 200) liveLog.removeAt(0); autoRemember() },
                 onLevel = { micLevel = it },
                 onError = { msg ->
                     messages.add(ChatMsg(false, msg, true))
@@ -981,7 +983,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private fun autoRemember(force: Boolean = false) {
         if (!memoryEnabled || tempMode || !disclosure || extracting) return
         val key = prefs.apiKey ?: return
-        val all = messages.filter { !it.error }
+        val all = (messages + liveLog).filter { !it.error }
         if (all.size < lastExtractCount) lastExtractCount = 0
         val fresh = all.size - lastExtractCount
         if (fresh < (if (force) 2 else 8)) return

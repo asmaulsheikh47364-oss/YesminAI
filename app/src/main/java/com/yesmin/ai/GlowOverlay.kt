@@ -84,9 +84,11 @@ object GlowOverlay {
         val wm = ctx.getSystemService(Context.WINDOW_SERVICE) as WindowManager
         if (view == null) {
             val v = GlowView(ctx.applicationContext)
+            val dm = android.util.DisplayMetrics()
+            @Suppress("DEPRECATION") wm.defaultDisplay.getRealMetrics(dm)
             val lp = WindowManager.LayoutParams(
-                WindowManager.LayoutParams.MATCH_PARENT,
-                WindowManager.LayoutParams.MATCH_PARENT,
+                dm.widthPixels,
+                dm.heightPixels,
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                     WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or

@@ -70,6 +70,13 @@ class AssistantService : Service() {
         return START_NOT_STICKY
     }
 
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        try { vm.stopSession() } catch (e: Exception) {}
+        GlowOverlay.hide(this)
+        stopSelf()
+        super.onTaskRemoved(rootIntent)
+    }
+
     override fun onDestroy() {
         GlowOverlay.hide(this)
         scope.cancel()

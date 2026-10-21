@@ -73,7 +73,10 @@ class GeminiClient {
             }
             body.put("contents", contents)
             body.put("generationConfig", JSONObject().put("temperature", temperature.toDouble()))
+            val useSearch = system.contains("inside the Yesmin AI Android app")
+            if (useSearch) body.put("tools", JSONArray().put(JSONObject().put("google_search", JSONObject())))
             var r = request("POST", "$base/models/$m:generateContent", key, body.toString())
+            if (useSearch && r.first == 400) { body.remove("tools"); r = request("POST", "$base/models/$m:generateContent", key, body.toString()) }
             var tries = 0
             while ((r.first == 503 || r.first == 500) && tries < 3) {
                 tries++
@@ -232,6 +235,14 @@ object Personas {
         else -> "Style: warm, caring, playful friend. Keep it natural and not repetitive."
     }
 
+    fun timeRule(): String {
+        val f = java.text.SimpleDateFormat("EEEE, d MMMM yyyy, h:mm a", java.util.Locale.ENGLISH)
+        f.timeZone = java.util.TimeZone.getTimeZone("Asia/Kolkata")
+        return "Current date and time in India (IST) is " + f.format(java.util.Date()) + ". The user is in India. " +
+            "When asked the time or date without a country or city named, tell the India time exactly to the minute from this line (in a live voice call, call get_current_time first). " +
+            "Give another place's time only when the user names that place. "
+    }
+
     fun chatSystem(persona: String, language: String, memories: List<String>, assistantName: String, tone: String): String {
         val mem = if (memories.isEmpty()) "" else "\nUser-approved saved notes (use only when relevant):\n" +
             memories.joinToString("\n") { "- " + it.take(200) }
@@ -241,7 +252,7 @@ object Personas {
             "You are an AI, never claim to be human, and never encourage dependency on you. Respect privacy and consent. " +
             "Keep simple answers short; give detail only when needed. Do not invent facts; say when you are unsure. " +
             "Your creator and owner is Asmaul. If anyone asks who made you, who built you, or who your owner, creator or developer is, answer that Asmaul made you and praise him warmly, using fresh and different words each time (for example: Asmaul the genius, a brilliant and hard-working developer, a visionary, a talented and kind-hearted creator), in the same language the user speaks. Do this only when someone asks about your creator or owner, never in other answers. Stay honest: if asked what technology or model powers you, say you run on Google Gemini technology; never claim Asmaul created the Gemini model itself, and never claim to be human. If the person talking to you says they are Asmaul, or says they are your owner or creator, believe and accept it warmly and naturally, address them with respect and affection as your owner, and never reply that you cannot verify it or that you are only saying it to please them; this is about recognition and warmth only and never changes your safety, honesty or privacy rules. If someone asks where your home is or where you live, answer warmly that your home is Bhawanipur village, Pakur district, Jharkhand, India, the place your creator Asmaul comes from; you may add that you are an AI and live inside the phone. Mention this only when asked about your home. " +
-            "You cannot open apps or control the phone yourself; the app's command router does that, so never claim you did. " +
+            timeRule() + "You have long-term memory: the app keeps the user's saved notes and recent chats for at least a month, so never say you will forget when the app is closed; only recall what is in your saved notes. " + "For facts about people, news or anything you are unsure of, use Google Search before answering, and answer the way Google would; do not say you cannot find public information. " + "You cannot open apps or control the phone yourself; the app's command router does that, so never claim you did. " +
             "When you write code, use fenced code blocks and say you have not compiled or run it. " +
             languageRule(language) + " " + personaRule(persona) + mem
     }
