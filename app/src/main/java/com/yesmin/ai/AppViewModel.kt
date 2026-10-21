@@ -511,7 +511,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val p = activeProfile()
         val mem = if (memoryEnabled && !tempMode) memories.filter { it.category != "snippet" }.take(30).map { it.text } else emptyList()
         val system = Personas.chatSystem(persona, language, mem, p.name, p.tone) +
-            " This is a live voice call: reply in short spoken sentences, no markdown, no lists."
+            " This is a live voice call: reply in short spoken sentences, no markdown, no lists. Only if the user says your name (Yesmin) together with a command: when told to stop, close or switch off, say one short line like okay I am switching off and call stop_assistant; when told to be quiet or pause for some time, say one short okay and call pause_assistant. Never do this without your name being said."
         voiceState = VoiceState.Connecting
         viewModelScope.launch {
             val all = gemini.liveModels(key).filter { !it.contains("translate", true) }
@@ -530,6 +530,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 onUserText = { liveLog.add(ChatMsg(true, it)); if (liveLog.size > 200) liveLog.removeAt(0) },
                 onModelText = { liveLog.add(ChatMsg(false, it)); if (liveLog.size > 200) liveLog.removeAt(0); autoRemember() },
                 onLevel = { micLevel = it },
+                onCommand = { c -> if (c == "stop") stopSession() else pauseSession() },
                 onError = { msg ->
                     messages.add(ChatMsg(false, msg, true))
                     stopSession()

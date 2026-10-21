@@ -26,7 +26,8 @@ class LiveVoice(
     private val onUserText: (String) -> Unit,
     private val onModelText: (String) -> Unit,
     private val onLevel: (Float) -> Unit,
-    private val onError: (String) -> Unit
+    private val onError: (String) -> Unit,
+    private val onCommand: (String) -> Unit = {}
 ) {
     private val ui = Handler(Looper.getMainLooper())
     private val http = OkHttpClient.Builder()
@@ -108,7 +109,7 @@ class LiveVoice(
             .put("outputAudioTranscription", JSONObject())
             .put("tools", JSONArray()
                 .put(JSONObject().put("googleSearch", JSONObject()))
-                .put(JSONObject().put("functionDeclarations", JSONArray().put(
+                .put(JSONObject().put("functionDeclarations", JSONArray().put(JSONObject().put("name", "stop_assistant").put("description", "Fully switch Yesmin off. Call it only when the user says her name (Yesmin) and tells her to stop, close or switch off. Say one short goodbye line in the same turn.")).put(JSONObject().put("name", "pause_assistant").put("description", "Make Yesmin quiet for a while. Call it only when the user says her name (Yesmin) and asks her to be quiet or pause for some time. Say one short line like okay in the same turn.")).put(
                     JSONObject().put("name", "get_current_time")
                         .put("description", "Returns the exact current date and time in India (IST). Call it every time the user asks the time or date.")))))
         return JSONObject().put("setup", setup).toString()
@@ -131,8 +132,14 @@ class LiveVoice(
                     val c = calls.getJSONObject(i)
                     val f = java.text.SimpleDateFormat("EEEE, d MMMM yyyy, h:mm a", java.util.Locale.ENGLISH)
                     f.timeZone = java.util.TimeZone.getTimeZone("Asia/Kolkata")
-                    resp.put(JSONObject().put("id", c.optString("id")).put("name", c.optString("name"))
-                        .put("response", JSONObject().put("result", f.format(java.util.Date()) + " IST")))
+                    val nm = c.optString("name")
+                    if (nm == "stop_assistant" || nm == "pause_assistant") {
+                        closeMode = if (nm == "stop_assistant") "stop" else "pause"
+                        scheduleClose()
+                    }
+                    val result = if (nm == "get_current_time") f.format(java.util.Date()) + " IST" else "ok, now say one very short goodbye line"
+                    resp.put(JSONObject().put("id", c.optString("id")).put("name", nm)
+                        .put("response", JSONObject().put("result", result)))
                 }
                 ws?.send(JSONObject().put("toolResponse", JSONObject().put("functionResponses", resp)).toString())
             }
@@ -243,6 +250,24 @@ class LiveVoice(
                 )
                 ws?.send(msg.toString())
             }
+        }.also { it.isDaemon = true }.start()
+    }
+
+    @Volatile private var closeMode: String? = null
+
+    private fun scheduleClose() {
+        Thread {
+            val start = System.currentTimeMillis()
+            while (running) {
+                val el = System.currentTimeMillis() - start
+                val heard = lastAudioMs > start
+                val quiet = q.isEmpty() && System.currentTimeMillis() - lastAudioMs > 1500
+                if ((heard && quiet) || el > 10000) break
+                try { Thread.sleep(200) } catch (e: Exception) {}
+            }
+            val m = closeMode
+            closeMode = null
+            if (m != null && running) post { onCommand(m) }
         }.also { it.isDaemon = true }.start()
     }
 
