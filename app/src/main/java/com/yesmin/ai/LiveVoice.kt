@@ -161,6 +161,12 @@ class LiveVoice(
                     val nm = c.optString("name")
                     if (nm == "stop_assistant" || nm == "pause_assistant") {
                         closeMode = if (nm == "stop_assistant") "stop" else "pause"
+                        if (quiet) {
+                            quiet = false
+                            for (b in held) q.offer(b)
+                            held.clear()
+                            lastAudioMs = System.currentTimeMillis()
+                        }
                         scheduleClose()
                     }
                     val result = if (nm == "get_current_time") f.format(java.util.Date()) + " IST" else "ok, now say one very short goodbye line"
@@ -177,9 +183,14 @@ class LiveVoice(
             for (i in 0 until parts.length()) {
                 val d = parts.optJSONObject(i)?.optJSONObject("inlineData")?.optString("data")
                 if (!d.isNullOrEmpty()) {
-                    lastAudioMs = System.currentTimeMillis()
-                    q.offer(Base64.decode(d, Base64.DEFAULT))
-                    post { onState(VoiceState.Speaking) }
+                    val bytes = Base64.decode(d, Base64.DEFAULT)
+                    if (quiet) {
+                        held.add(bytes)
+                    } else {
+                        lastAudioMs = System.currentTimeMillis()
+                        q.offer(bytes)
+                        post { onState(VoiceState.Speaking) }
+                    }
                 }
             }
         }
@@ -194,6 +205,17 @@ class LiveVoice(
             val m = modelBuf.toString().trim()
             userBuf.setLength(0)
             modelBuf.setLength(0)
+            if (quiet) {
+                if (hasName(u)) {
+                    quiet = false
+                    for (b in held) q.offer(b)
+                    held.clear()
+                    lastAudioMs = System.currentTimeMillis()
+                } else {
+                    held.clear()
+                    return
+                }
+            }
             post {
                 if (u.isNotEmpty()) onUserText(u)
                 if (m.isNotEmpty()) onModelText(m)
@@ -277,6 +299,15 @@ class LiveVoice(
                 ws?.send(msg.toString())
             }
         }.also { it.isDaemon = true }.start()
+    }
+
+    @Volatile var quiet = false
+    private val held = java.util.concurrent.CopyOnWriteArrayList<ByteArray>()
+
+    private fun hasName(t: String): Boolean {
+        val x = t.lowercase()
+        return listOf("yesmin", "yasmin", "yasmeen", "yasmine", "yesmeen", "esmin", "asmin", "jasmin",
+            "यास्मिन", "येस्मिन", "यस्मिन", "एस्मिन", "यैस्मिन", "यास्मीन", "एसमिन", "यासमिन", "यस्मीन").any { x.contains(it) }
     }
 
     @Volatile private var closeMode: String? = null
