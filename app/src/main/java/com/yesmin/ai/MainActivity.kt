@@ -148,9 +148,9 @@ fun MainScaffold(vm: AppViewModel) {
     }
     val tabs = listOf(
         Tab("home", "Home", "🏠"), Tab("chat", "Chat", "💬"), Tab("voice", "Voice", "🎤"),
-        Tab("apps", "Apps", "📱"), Tab("more", "More", "☰")
+        Tab("brain", "AI Brain", "🧠"), Tab("more", "More", "☰")
     )
-    val moreRoutes = setOf("more", "brain", "tools", "settings", "memory", "calc", "device", "support", "profiles", "reminders", "messages", "vision")
+    val moreRoutes = setOf("more", "apps", "tools", "settings", "memory", "calc", "device", "support", "profiles", "reminders", "messages", "vision")
     Scaffold(
         snackbarHost = { SnackbarHost(snack) },
         bottomBar = {

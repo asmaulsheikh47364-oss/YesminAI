@@ -513,7 +513,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 onState = { if (sessionActive && !sessionPaused) voiceState = it },
                 onUserText = { messages.add(ChatMsg(true, it)) },
                 onModelText = { messages.add(ChatMsg(false, it)) },
-                onLevel = { },
+                onLevel = { micLevel = it },
                 onError = { msg ->
                     messages.add(ChatMsg(false, msg, true))
                     stopSession()

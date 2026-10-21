@@ -165,19 +165,7 @@ fun HomeScreen(vm: AppViewModel, nav: NavHostController) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text("Yesmin AI", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-        NeonAvatar(130.dp, vm.activeProfile().letter, vm.activeProfile().c1, vm.activeProfile().c2)
-        Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-        Text("Main " + vm.activeProfile().name + " hoon, aapki personal AI assistant. Aaj main kaise madad karoon?", style = MaterialTheme.typography.bodyMedium)
-        Text(
-            "● " + vm.statusLabel() + "   ·   Gemini: " + vm.brainStatus.label(),
-            style = MaterialTheme.typography.labelLarge
-        )
-        Box(
-            Modifier.size(86.dp).clip(CircleShape).background(NeonBrush).clickable { onMic() },
-            contentAlignment = Alignment.Center
-        ) { Text("🎤", fontSize = 36.sp) }
-        Text("Mic dabao aur bolo", style = MaterialTheme.typography.bodySmall)
+        HomeHero(vm, title) { onMic() }
 
         Card(onClick = { nav.navigate("brain") { launchSingleTop = true } }, modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
