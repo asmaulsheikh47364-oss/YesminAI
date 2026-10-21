@@ -85,7 +85,7 @@ class LiveVoice(
     private fun closeText(code: Int, reason: String): String {
         val r = reason.lowercase()
         return if (r.contains("quota") || r.contains("exhaust") || r.contains("limit") || r.contains("429"))
-            "Gemini ki limit khatam ho gayi hai, thodi der baad try karo."
+            "Gemini ki limit khatam ho gayi hai, thodi der baad try karo. [" + code + " " + reason.take(160) + "]"
         else "Live connection band ho gaya ($code). " + reason.take(100)
     }
 
