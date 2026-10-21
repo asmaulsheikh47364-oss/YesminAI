@@ -71,7 +71,7 @@ class AssistantService : Service() {
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
-        try { vm.stopSession() } catch (e: Exception) {}
+        try { (application as YesminApp).vm.stopSession() } catch (e: Exception) {}
         GlowOverlay.hide(this)
         stopSelf()
         super.onTaskRemoved(rootIntent)
