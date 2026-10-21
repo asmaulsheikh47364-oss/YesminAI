@@ -76,7 +76,7 @@ class GeminiClient {
             val useSearch = system.contains("inside the Yesmin AI Android app")
             if (useSearch) body.put("tools", JSONArray().put(JSONObject().put("google_search", JSONObject())))
             var r = request("POST", "$base/models/$m:generateContent", key, body.toString())
-            if (useSearch && r.first == 400) { body.remove("tools"); r = request("POST", "$base/models/$m:generateContent", key, body.toString()) }
+            if (useSearch && (r.first == 400 || r.first == 429)) { body.remove("tools"); r = request("POST", "$base/models/$m:generateContent", key, body.toString()) }
             var tries = 0
             while ((r.first == 503 || r.first == 500) && tries < 3) {
                 tries++

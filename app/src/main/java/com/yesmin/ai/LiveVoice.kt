@@ -53,6 +53,7 @@ class LiveVoice(
 
     fun start(key: String, model: String, system: String, voiceName: String) {
         if (running) return
+        params = arrayOf(key, model, system, voiceName)
         running = true
         ready = false
         muted = false
@@ -69,12 +70,37 @@ class LiveVoice(
             override fun onMessage(webSocket: WebSocket, bytes: ByteString) { handle(bytes.utf8()) }
             override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
                 webSocket.close(1000, null)
-                if (running) fail(closeText(code, reason))
+                if (running) { if (!retryWithoutSearch()) fail(closeText(code, reason)) }
             }
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                 if (running) fail(failText(response?.code))
             }
         })
+    }
+
+    @Volatile private var useSearch = true
+    private var params: Array<String>? = null
+
+    private fun retryWithoutSearch(): Boolean {
+        val p = params ?: return false
+        if (!useSearch || lastAudioMs != 0L) return false
+        useSearch = false
+        running = false
+        ready = false
+        try { ws?.cancel() } catch (e: Exception) {}
+        ws = null
+        try { rec?.stop() } catch (e: Exception) {}
+        try { rec?.release() } catch (e: Exception) {}
+        rec = null
+        try { track?.stop() } catch (e: Exception) {}
+        try { track?.release() } catch (e: Exception) {}
+        track = null
+        q.clear()
+        Thread {
+            try { Thread.sleep(500) } catch (e: Exception) {}
+            start(p[0], p[1], p[2], p[3])
+        }.also { it.isDaemon = true }.start()
+        return true
     }
 
     private fun fail(msg: String) {
@@ -108,7 +134,7 @@ class LiveVoice(
             .put("inputAudioTranscription", JSONObject())
             .put("outputAudioTranscription", JSONObject())
             .put("tools", JSONArray()
-                .put(JSONObject().put("googleSearch", JSONObject()))
+                .also { if (useSearch) it.put(JSONObject().put("googleSearch", JSONObject())) }
                 .put(JSONObject().put("functionDeclarations", JSONArray().put(JSONObject().put("name", "stop_assistant").put("description", "Fully switch Yesmin off. Call it only when the user says her name (Yesmin) and tells her to stop, close or switch off. Say one short goodbye line in the same turn.")).put(JSONObject().put("name", "pause_assistant").put("description", "Make Yesmin quiet for a while. Call it only when the user says her name (Yesmin) and asks her to be quiet or pause for some time. Say one short line like okay in the same turn.")).put(
                     JSONObject().put("name", "get_current_time")
                         .put("description", "Returns the exact current date and time in India (IST). Call it every time the user asks the time or date.")))))
