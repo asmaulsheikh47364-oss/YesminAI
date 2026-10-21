@@ -407,7 +407,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val r = gemini.generate(key, model, Personas.chatSystem(persona, language, mem, activeProfile().name, activeProfile().tone), hist, temperature)
             busy = false
             noteResult(r)
-            if (r.ok) reply(r.text, speak) else reply(r.text, false, true)
+            if (r.ok) { reply(r.text, speak); autoRemember() } else reply(r.text, false, true)
         }
     }
 
@@ -525,8 +525,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             live?.stop()
             val lv = LiveVoice(
                 onState = { if (sessionActive && !sessionPaused) voiceState = it },
-                onUserText = { messages.add(ChatMsg(true, it)) },
-                onModelText = { messages.add(ChatMsg(false, it)) },
+                onUserText = { messages.add(ChatMsg(true, it)); if (saveHistory && !tempMode) db.addHistory(true, it) },
+                onModelText = { messages.add(ChatMsg(false, it)); if (saveHistory && !tempMode) db.addHistory(false, it); autoRemember() },
                 onLevel = { micLevel = it },
                 onError = { msg ->
                     messages.add(ChatMsg(false, msg, true))
@@ -561,6 +561,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun stopSession() {
+        autoRemember(true)
         live?.stop()
         live = null
         sessionActive = false
@@ -971,6 +972,54 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         ReminderScheduler.cancel(ctx, id)
         db.deleteReminder(id)
         refreshReminders()
+    }
+
+    private var lastExtractCount = 0
+    private var extracting = false
+
+    /** Quietly turns lasting facts from recent chat into saved notes. */
+    private fun autoRemember(force: Boolean = false) {
+        if (!memoryEnabled || tempMode || !disclosure || extracting) return
+        val key = prefs.apiKey ?: return
+        val all = messages.filter { !it.error }
+        if (all.size < lastExtractCount) lastExtractCount = 0
+        val fresh = all.size - lastExtractCount
+        if (fresh < (if (force) 2 else 8)) return
+        val chunk = all.takeLast(minOf(fresh, 24))
+        val known = memories.take(40).map { it.text }
+        val sys = "You write long-term memory notes about the user from a chat. " +
+            "Return ONLY a JSON array of at most 5 short strings (each under 120 characters), written in the user's own language. " +
+            "Keep only lasting facts that will still be useful weeks later: name, family, place, work, projects, preferences, goals, routines. " +
+            "Never include passwords, PINs, card, bank or ID numbers, OTPs, exact addresses, phone numbers, health details, one-time requests, small talk, or anything the assistant said about itself. " +
+            "Skip facts already in the existing notes. If nothing qualifies, return []."
+        val transcript = chunk.joinToString("\n") { (if (it.fromUser) "User: " else "Assistant: ") + it.text.take(400) }
+        val ask = "Existing notes:\n" + (if (known.isEmpty()) "(none)" else known.joinToString("\n") { "- " + it }) + "\n\nChat:\n" + transcript
+        extracting = true
+        lastExtractCount = all.size
+        viewModelScope.launch {
+            try {
+                val r = gemini.generate(key, model, sys, listOf("user" to ask), 0.2f)
+                if (!r.ok) return@launch
+                val t = r.text.trim().removePrefix("```json").removePrefix("```").removeSuffix("```").trim()
+                val a = t.indexOf('[')
+                val b = t.lastIndexOf(']')
+                if (a < 0 || b <= a) return@launch
+                val arr = org.json.JSONArray(t.substring(a, b + 1))
+                val have = memories.map { it.text.lowercase() }
+                var added = 0
+                for (i in 0 until minOf(arr.length(), 5)) {
+                    val n = arr.optString(i).trim()
+                    if (n.length < 4 || n.length > 160) continue
+                    if (Sensitive.looksSensitive(n)) continue
+                    if (have.any { it == n.lowercase() }) continue
+                    if (db.add("auto", n)) added++
+                }
+                if (added > 0) refreshMemories()
+            } catch (e: Exception) {
+            } finally {
+                extracting = false
+            }
+        }
     }
 
     // ---------- memory ----------

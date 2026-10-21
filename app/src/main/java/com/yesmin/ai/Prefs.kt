@@ -91,7 +91,7 @@ class Prefs(ctx: Context) {
         get() = sp.getBoolean("memory_enabled", true)
         set(v) { sp.edit().putBoolean("memory_enabled", v).apply() }
     var saveHistory: Boolean
-        get() = sp.getBoolean("save_history", false)
+        get() = sp.getBoolean("save_history", true)
         set(v) { sp.edit().putBoolean("save_history", v).apply() }
     var temperature: Float
         get() = sp.getFloat("temperature", 0.8f)
