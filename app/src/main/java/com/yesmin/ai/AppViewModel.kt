@@ -492,7 +492,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
         voiceState = VoiceState.Connecting
         startLive()
-        try { StandbyService.stop(ctx) } catch (e: Exception) {}
     }
 
     private val liveLog = ArrayList<ChatMsg>()
@@ -512,7 +511,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val p = activeProfile()
         val mem = if (memoryEnabled && !tempMode) memories.filter { it.category != "snippet" }.take(30).map { it.text } else emptyList()
         val system = Personas.chatSystem(persona, language, mem, p.name, p.tone) +
-            " This is a live voice call: reply in short spoken sentences, no markdown, no lists. Only if the user says your name (Yesmin) together with a command: when told to stop, close or switch off, say one short line like okay I am switching off and call stop_assistant; when told to be quiet or pause for some time, say one short okay and call pause_assistant. Never do this without your name being said."
+            " This is a live voice call: reply in short spoken sentences, no markdown, no lists. You can see the user's phone screen: call read_screen whenever they ask what is on the screen, ask you to read, explain or help with something shown, or say this or here; call recent_activity when they ask what they just did. Describe what you find in simple spoken words and never read out passwords or OTPs. Only if the user says your name (Yesmin) together with a command: when told to stop, close or switch off, say one short line like okay I am switching off and call stop_assistant; when told to be quiet or pause for some time, say one short okay and call pause_assistant. Never do this without your name being said."
         voiceState = VoiceState.Connecting
         viewModelScope.launch {
             val all = gemini.liveModels(key).filter { !it.contains("translate", true) }

@@ -27,6 +27,7 @@ class StandbyService : Service() {
     private val main = Handler(Looper.getMainLooper())
     @Volatile private var alive = false
     @Volatile private var woke = false
+    @Volatile private var gen = 0
     private var worker: Thread? = null
 
     private val nameRegex = Regex("yesmin|yasmin|yasmeen|yasmine|jasmin|jasmine|yes mean|yes men|yes min|yes mind|yaz min|us mean|as mean|yes mine|यास्मिन|येस्मिन|यस्मिन|एस्मिन")
@@ -55,6 +56,7 @@ class StandbyService : Service() {
         if (!alive) {
             alive = true
             woke = false
+            gen++
             worker = Thread { listenLoop() }.also { it.isDaemon = true; it.start() }
         }
         return START_STICKY
@@ -114,7 +116,7 @@ class StandbyService : Service() {
             ar.startRecording()
             Dbg.log(this, "standby chalu: Yesmin bolo")
             val buf = ByteArray(4096)
-            while (alive) {
+            while (alive && !sessionBusy()) {
                 val n = ar.read(buf, 0, buf.size)
                 if (n <= 0) { Thread.sleep(50); continue }
                 val done = rec.acceptWaveForm(buf, n)
@@ -141,10 +143,30 @@ class StandbyService : Service() {
                     Dbg.log(this, "wake! session shuru")
                     val vm = (application as YesminApp).vm
                     if (!vm.sessionActive) vm.startSession() else if (vm.sessionPaused) vm.resumeSession()
-                } catch (e: Exception) {}
-                main.postDelayed({ stopSelf() }, 4000L)
+                    Dbg.log(this, "wake ke baad: active=" + vm.sessionActive + " state=" + vm.voiceState + " notice=" + vm.notice)
+                } catch (e: Exception) {
+                    Dbg.log(this, "wake error: " + e.message)
+                }
+                watchSession()
             }, 500L)
         }
+    }
+
+    private fun sessionBusy(): Boolean = try {
+        (application as YesminApp).vm.sessionActive
+    } catch (e: Exception) {
+        false
+    }
+
+    private fun watchSession() {
+        val g = gen
+        val r = object : Runnable {
+            override fun run() {
+                if (g != gen) return
+                if (sessionBusy()) main.postDelayed(this, 1500L) else stopSelf()
+            }
+        }
+        main.postDelayed(r, 3000L)
     }
 
     override fun onDestroy() {

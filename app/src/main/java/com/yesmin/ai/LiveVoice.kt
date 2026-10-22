@@ -135,7 +135,7 @@ class LiveVoice(
             .put("outputAudioTranscription", JSONObject())
             .put("tools", JSONArray()
                 .also { if (useSearch) it.put(JSONObject().put("googleSearch", JSONObject())) }
-                .put(JSONObject().put("functionDeclarations", JSONArray().put(JSONObject().put("name", "stop_assistant").put("description", "Fully switch Yesmin off. Call it only when the user says her name (Yesmin) and tells her to stop, close or switch off. Say one short goodbye line in the same turn.")).put(JSONObject().put("name", "pause_assistant").put("description", "Make Yesmin quiet for a while. Call it only when the user says her name (Yesmin) and asks her to be quiet or pause for some time. Say one short line like okay in the same turn.")).put(
+                .put(JSONObject().put("functionDeclarations", JSONArray().put(JSONObject().put("name", "read_screen").put("description", "Returns the text currently visible on the user phone screen. Call it whenever the user asks what is on the screen, asks you to read or explain something shown, or says this or here about something on screen.")).put(JSONObject().put("name", "recent_activity").put("description", "Returns what the user recently did on the phone (taps and screens opened). Call it when the user asks what they just did or what happened.")).put(JSONObject().put("name", "stop_assistant").put("description", "Fully switch Yesmin off. Call it only when the user says her name (Yesmin) and tells her to stop, close or switch off. Say one short goodbye line in the same turn.")).put(JSONObject().put("name", "pause_assistant").put("description", "Make Yesmin quiet for a while. Call it only when the user says her name (Yesmin) and asks her to be quiet or pause for some time. Say one short line like okay in the same turn.")).put(
                     JSONObject().put("name", "get_current_time")
                         .put("description", "Returns the exact current date and time in India (IST). Call it every time the user asks the time or date.")))))
         return JSONObject().put("setup", setup).toString()
@@ -169,7 +169,12 @@ class LiveVoice(
                         }
                         scheduleClose()
                     }
-                    val result = if (nm == "get_current_time") f.format(java.util.Date()) + " IST" else "ok, now say one very short goodbye line"
+                    val result = when (nm) {
+                        "get_current_time" -> f.format(java.util.Date()) + " IST"
+                        "read_screen" -> YesminAccessibilityService.instance?.dumpScreen() ?: "Accessibility service on nahi hai. Settings mein Yesmin AI ko Accessibility mein on karna padega."
+                        "recent_activity" -> YesminAccessibilityService.instance?.recentActivity() ?: "Accessibility service on nahi hai."
+                        else -> "ok, now say one very short goodbye line"
+                    }
                     resp.put(JSONObject().put("id", c.optString("id")).put("name", nm)
                         .put("response", JSONObject().put("result", result)))
                 }

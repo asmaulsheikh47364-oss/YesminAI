@@ -20,7 +20,52 @@ class YesminAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() { instance = this }
     override fun onUnbind(intent: Intent?): Boolean { instance = null; return super.onUnbind(intent) }
     override fun onDestroy() { instance = null; super.onDestroy() }
-    override fun onAccessibilityEvent(event: AccessibilityEvent?) {}
+    private val actLog = ArrayList<String>()
+
+    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        val e = event ?: return
+        try {
+            val pkg = e.packageName?.toString() ?: return
+            if (pkg == packageName || e.isPassword) return
+            val label = e.text.joinToString(" ").ifBlank { e.contentDescription?.toString() ?: "" }
+            val what = when (e.eventType) {
+                AccessibilityEvent.TYPE_VIEW_CLICKED -> "tap: " + label
+                AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> "opened: " + (e.className?.toString()?.substringAfterLast('.') ?: "") + " " + label
+                else -> return
+            }
+            val t = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.ENGLISH).format(java.util.Date())
+            synchronized(actLog) {
+                actLog.add(t + " " + pkg + " " + what.take(120))
+                if (actLog.size > 40) actLog.removeAt(0)
+            }
+        } catch (x: Exception) {
+        }
+    }
+
+    fun recentActivity(): String = synchronized(actLog) {
+        if (actLog.isEmpty()) "Abhi koi activity record nahi hui" else actLog.takeLast(15).joinToString("\n")
+    }
+
+    fun dumpScreen(): String {
+        val root = rootInActiveWindow ?: return "Screen abhi padh nahi paaya"
+        val sb = StringBuilder()
+        sb.append("App: ").append(root.packageName).append("\n")
+        var count = 0
+        fun walk(n: AccessibilityNodeInfo?) {
+            if (n == null || sb.length > 4000 || count > 500) return
+            count++
+            if (n.isVisibleToUser && !n.isPassword) {
+                val t = (n.text ?: n.contentDescription)?.toString()?.trim()
+                if (!t.isNullOrEmpty()) {
+                    if (n.isClickable) sb.append("[button] ")
+                    sb.append(t.take(200)).append("\n")
+                }
+            }
+            for (i in 0 until n.childCount) walk(n.getChild(i))
+        }
+        walk(root)
+        return sb.toString()
+    }
     override fun onInterrupt() {}
 
     fun perform(a: A11yAction): Boolean = when (a) {
