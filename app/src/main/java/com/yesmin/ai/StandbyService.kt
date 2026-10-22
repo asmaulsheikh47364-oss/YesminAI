@@ -8,39 +8,35 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
-import android.media.AudioManager
+import android.media.AudioFormat
+import android.media.AudioRecord
+import android.media.MediaRecorder
 import android.os.Build
-import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
-import android.speech.RecognitionListener
-import android.speech.RecognizerIntent
-import android.speech.SpeechRecognizer
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import org.json.JSONObject
+import org.vosk.Model
+import org.vosk.Recognizer
+import java.io.File
 
-/** Light standby: Yesmin is off (no Gemini), only the phone's own recognizer waits for her name plus an "on" word. */
+/** Offline standby: no Gemini, no internet. Only listens on the phone for her name, then starts the voice session. */
 class StandbyService : Service() {
     private val main = Handler(Looper.getMainLooper())
-    private var rec: SpeechRecognizer? = null
-    private var alive = false
-    private var muted = false
-    private lateinit var audio: AudioManager
-    private val streams = intArrayOf(AudioManager.STREAM_NOTIFICATION, AudioManager.STREAM_SYSTEM)
+    @Volatile private var alive = false
+    @Volatile private var woke = false
+    private var worker: Thread? = null
 
-    private val names = listOf("yesmin", "yasmin", "yasmeen", "yasmine", "yesmeen", "jasmin", "esmin", "asmin",
-        "यास्मिन", "येस्मिन", "यस्मिन", "एस्मिन", "यैस्मिन", "यास्मीन", "एसमिन", "यासमिन", "यस्मीन")
-    private val onWords = listOf("chalu", "chaalu", "on", "shuru", "jago", "jaag", "uth", "start", "active",
-        "चालू", "ऑन", "शुरू", "जागो", "जाग", "उठ", "स्टार्ट", "एक्टिव")
-    private val nameRegex = Regex(names.joinToString("|"))
+    private val nameRegex = Regex("yesmin|yasmin|yasmeen|yasmine|jasmin|jasmine|yes mean|yes men|yes min|yes mind|yaz min|us mean|as mean|yes mine|यास्मिन|येस्मिन|यस्मिन|एस्मिन")
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        audio = getSystemService(Context.AUDIO_SERVICE) as AudioManager
         if (intent?.action == ACTION_OFF) {
-            shutdown()
+            alive = false
+            stopSelf()
             return START_NOT_STICKY
         }
         try {
@@ -52,10 +48,15 @@ class StandbyService : Service() {
             if (Build.VERSION.SDK_INT >= 29) startForeground(NOTIF, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
             else startForeground(NOTIF, n)
         } catch (e: Exception) {
+            Dbg.log(this, "standby shuru nahi hua: " + e.message)
             stopSelf()
             return START_NOT_STICKY
         }
-        if (!alive) { alive = true; Dbg.log(this, "standby chalu, sun raha hai"); listen() }
+        if (!alive) {
+            alive = true
+            woke = false
+            worker = Thread { listenLoop() }.also { it.isDaemon = true; it.start() }
+        }
         return START_STICKY
     }
 
@@ -74,102 +75,80 @@ class StandbyService : Service() {
         return NotificationCompat.Builder(this, CHANNEL)
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
             .setContentTitle("Yesmin standby")
-            .setContentText("Bolo: Yesmin, chalu ho jao")
+            .setContentText("Bolo: Yesmin")
             .setContentIntent(open)
             .addAction(0, "Standby band", off)
             .setOngoing(true)
             .build()
     }
 
-    private fun listen() {
-        if (!alive) return
-        if (!SpeechRecognizer.isRecognitionAvailable(this)) { shutdown(); return }
-        release()
-        val r = SpeechRecognizer.createSpeechRecognizer(this)
-        rec = r
-        r.setRecognitionListener(object : RecognitionListener {
-            override fun onReadyForSpeech(params: Bundle?) {}
-            override fun onBeginningOfSpeech() {}
-            override fun onRmsChanged(rmsdB: Float) {}
-            override fun onBufferReceived(buffer: ByteArray?) {}
-            override fun onEndOfSpeech() {}
-            override fun onEvent(eventType: Int, params: Bundle?) {}
-            override fun onPartialResults(partialResults: Bundle?) { Dbg.log(this@StandbyService, "partial: " + partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION), false); check(partialResults) }
-            override fun onResults(results: Bundle?) { Dbg.log(this@StandbyService, "suna: " + results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)); if (!check(results)) again(300) }
-            override fun onError(error: Int) {
-                Dbg.log(this@StandbyService, "error " + error, error != 6 && error != 7)
-                if (error == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS) { shutdown(); return }
-                again(if (error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY) 1500L else 400L)
-            }
-        })
-        val i = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
-            .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            .putExtra(RecognizerIntent.EXTRA_LANGUAGE, "hi-IN")
-            .putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-            .putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, packageName)
-        mute()
-        try { r.startListening(i) } catch (e: Exception) { again(1000L) }
-    }
-
-    private fun again(ms: Long) { main.postDelayed({ listen() }, ms) }
-
-    private fun check(b: Bundle?): Boolean {
-        val l = b?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION) ?: return false
-        for (t in l) if (isWake(t)) { wake(); return true }
-        return false
-    }
-
-    private fun isWake(t: String): Boolean {
-        val x = t.lowercase()
-        val n = nameRegex.findAll(x).count()
-        if (n == 0) return false
-        return n >= 2 || onWords.any { x.contains(it) }
-    }
-
-    private fun wake() {
-        if (!alive) return
-        alive = false
-        main.post {
-            release()
-            unmute()
-            try {
-                val vm = (application as YesminApp).vm
-                Dbg.log(this, "wake! session shuru kar raha hoon"); if (!vm.sessionActive) vm.startSession() else if (vm.sessionPaused) vm.resumeSession()
-            } catch (e: Exception) {}
-            main.postDelayed({ stopSelf() }, 4000L)
+    private fun copyAssets(src: String, dst: File) {
+        val list = assets.list(src) ?: return
+        if (list.isEmpty()) {
+            dst.parentFile?.mkdirs()
+            assets.open(src).use { i -> dst.outputStream().use { o -> i.copyTo(o) } }
+        } else {
+            dst.mkdirs()
+            for (n in list) copyAssets(src + "/" + n, File(dst, n))
         }
     }
 
-    private fun shutdown() {
-        alive = false
-        release()
-        unmute()
-        stopSelf()
-    }
-
-    private fun release() {
-        try { rec?.cancel() } catch (e: Exception) {}
-        try { rec?.destroy() } catch (e: Exception) {}
-        rec = null
-    }
-
-    private fun mute() {
-        if (muted) return
-        muted = true
-        for (s in streams) { try { audio.adjustStreamVolume(s, AudioManager.ADJUST_MUTE, 0) } catch (e: Exception) {} }
-    }
-
-    private fun unmute() {
-        if (!muted) return
-        muted = false
-        for (s in streams) { try { audio.adjustStreamVolume(s, AudioManager.ADJUST_UNMUTE, 0) } catch (e: Exception) {} }
+    private fun listenLoop() {
+        var model: Model? = null
+        var rec: Recognizer? = null
+        var ar: AudioRecord? = null
+        try {
+            val dir = File(filesDir, "vosk-model")
+            if (!File(dir, "am/final.mdl").exists()) copyAssets("vosk-model", dir)
+            model = Model(dir.absolutePath)
+            rec = Recognizer(model, 16000.0f)
+            val minBuf = AudioRecord.getMinBufferSize(16000, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
+            ar = AudioRecord(
+                MediaRecorder.AudioSource.VOICE_RECOGNITION, 16000,
+                AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, maxOf(minBuf, 8000) * 2
+            )
+            if (ar.state != AudioRecord.STATE_INITIALIZED) {
+                Dbg.log(this, "standby: mic nahi mila")
+                return
+            }
+            ar.startRecording()
+            Dbg.log(this, "standby chalu: Yesmin bolo")
+            val buf = ByteArray(4096)
+            while (alive) {
+                val n = ar.read(buf, 0, buf.size)
+                if (n <= 0) { Thread.sleep(50); continue }
+                val done = rec.acceptWaveForm(buf, n)
+                val txt = if (done) JSONObject(rec.result).optString("text") else JSONObject(rec.partialResult).optString("partial")
+                if (txt.isNotBlank()) {
+                    if (done) Dbg.log(this, "suna: " + txt, false)
+                    if (nameRegex.containsMatchIn(txt.lowercase())) {
+                        woke = true
+                        alive = false
+                    }
+                }
+            }
+        } catch (e: Throwable) {
+            Dbg.log(this, "standby error: " + e.message)
+        } finally {
+            try { ar?.stop() } catch (e: Exception) {}
+            try { ar?.release() } catch (e: Exception) {}
+            try { rec?.close() } catch (e: Throwable) {}
+            try { model?.close() } catch (e: Throwable) {}
+        }
+        if (woke) {
+            main.postDelayed({
+                try {
+                    Dbg.log(this, "wake! session shuru")
+                    val vm = (application as YesminApp).vm
+                    if (!vm.sessionActive) vm.startSession() else if (vm.sessionPaused) vm.resumeSession()
+                } catch (e: Exception) {}
+                main.postDelayed({ stopSelf() }, 4000L)
+            }, 500L)
+        }
     }
 
     override fun onDestroy() {
         alive = false
-        main.removeCallbacksAndMessages(null)
-        release()
-        try { if (::audio.isInitialized) unmute() } catch (e: Exception) {}
         super.onDestroy()
     }
 

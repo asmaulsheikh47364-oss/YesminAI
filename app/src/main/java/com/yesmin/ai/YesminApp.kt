@@ -11,6 +11,12 @@ class YesminApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        try {
+            val am = getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager
+            for (st in intArrayOf(android.media.AudioManager.STREAM_NOTIFICATION, android.media.AudioManager.STREAM_SYSTEM, android.media.AudioManager.STREAM_RING)) {
+                try { am.adjustStreamVolume(st, android.media.AudioManager.ADJUST_UNMUTE, 0) } catch (e: Exception) {}
+            }
+        } catch (e: Exception) {}
         try { Dbg.log(this, "app start; assistant=" + android.provider.Settings.Secure.getString(contentResolver, "assistant") + " | vis=" + android.provider.Settings.Secure.getString(contentResolver, "voice_interaction_service")) } catch (e: Exception) {}
         val old = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { t, e ->
