@@ -78,6 +78,7 @@
         </service>
         <service android:name=".YesminSessionService" android:permission="android.permission.BIND_VOICE_INTERACTION" android:exported="true" />
         <service android:name=".YesminRecognizer" android:exported="true" />
+        <service android:name=".StandbyService" android:exported="false" android:foregroundServiceType="microphone" />
         <service android:name=".AssistantService" android:exported="false" android:foregroundServiceType="microphone" />
         <service android:name=".YesminTile" android:exported="true" android:label="Yesmin AI" android:icon="@android:drawable/ic_btn_speak_now" android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
             <intent-filter>

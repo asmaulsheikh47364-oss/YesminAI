@@ -492,6 +492,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
         voiceState = VoiceState.Connecting
         startLive()
+        try { StandbyService.stop(ctx) } catch (e: Exception) {}
     }
 
     private val liveLog = ArrayList<ChatMsg>()
@@ -530,7 +531,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 onUserText = { liveLog.add(ChatMsg(true, it)); if (liveLog.size > 200) liveLog.removeAt(0) },
                 onModelText = { liveLog.add(ChatMsg(false, it)); if (liveLog.size > 200) liveLog.removeAt(0); autoRemember() },
                 onLevel = { micLevel = it },
-                onCommand = { c -> if (c == "stop") stopSession() else { live?.quiet = true; voiceState = VoiceState.Listening } },
+                onCommand = { c -> if (c == "stop") { try { StandbyService.start(ctx) } catch (e: Exception) {}; stopSession() } else { live?.quiet = true; voiceState = VoiceState.Listening } },
                 onError = { msg ->
                     messages.add(ChatMsg(false, msg, true))
                     stopSession()
