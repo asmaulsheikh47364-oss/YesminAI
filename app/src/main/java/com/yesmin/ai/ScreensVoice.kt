@@ -2,6 +2,10 @@
 
 package com.yesmin.ai
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.unit.sp
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -260,8 +264,6 @@ fun AppsScreen(vm: AppViewModel, nav: NavHostController) {
             style = MaterialTheme.typography.bodySmall
         )
         vm.ytResults.forEach { v -> TextButton(onClick = { vm.openVideo(v) }) { Text("▶ " + v.title.take(50) + " — " + v.channel.take(20)) } }
-        Button(onClick = { nav.navigate("reminders") { launchSingleTop = true } }, modifier = Modifier.fillMaxWidth()) { Text("⏰ Set Reminder") }
-        Button(onClick = { nav.navigate("messages") { launchSingleTop = true } }, modifier = Modifier.fillMaxWidth()) { Text("✉️ Send Message / Call / Messages padho") }
         Text("Call lagao", style = MaterialTheme.typography.titleSmall)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             OutlinedTextField(value = callTarget, onValueChange = { callTarget = it }, singleLine = true, modifier = Modifier.weight(1f), label = { Text("Naam ya number") })
@@ -288,17 +290,10 @@ fun MoreScreen(nav: NavHostController) {
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Text("More", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        NavRow("📱", "Apps & Phone", "App kholo, phone control, YouTube") { nav.navigate("apps") { launchSingleTop = true } }
         NavRow("📷", "Photo AI", "Photo dikhao aur sawaal poochho") { nav.navigate("vision") { launchSingleTop = true } }
-        NavRow("✉️", "Messages & Call", "Message bhejo, call lagao, aaye message padho aur jawab do") { nav.navigate("messages") { launchSingleTop = true } }
-        NavRow("⏰", "Reminders", "Yaad dilane wale alarm aur notifications") { nav.navigate("reminders") { launchSingleTop = true } }
-        NavRow("🎭", "AI Personalities", "Yesmin, Zara, Riya, Aisha ya apni khud ki") { nav.navigate("profiles") { launchSingleTop = true } }
-        NavRow("🧠", "AI Brain", "Gemini key, model, connection test") { nav.navigate("brain") { launchSingleTop = true } }
-        NavRow("🛠", "AI Tools", "Code, translate, writing, study, ideas") { nav.navigate("tools") { launchSingleTop = true } }
-        NavRow("🗂", "Memory", "Notes, tasks aur pasand — edit/delete karo") { nav.navigate("memory") { launchSingleTop = true } }
-        NavRow("📊", "Device Info", "Battery, storage, network, RAM, CPU") { nav.navigate("device") { launchSingleTop = true } }
-        NavRow("🔒", "Privacy & Security", "Permissions, data delete, accessibility") { nav.navigate("settings") { launchSingleTop = true } }
-        NavRow("⚙️", "Settings", "Language, voice, theme, personality") { nav.navigate("settings") { launchSingleTop = true } }
-        NavRow("💬", "Help & Support", "FAQ aur app ki jaankari") { nav.navigate("support") { launchSingleTop = true } }
+        NavRow("🧮", "Calculator", "Jodna, ghatana, percent aur aur bhi") { nav.navigate("calc") { launchSingleTop = true } }
+        NavRow("💬", "Help & Support", "Creator ki jaankari aur sampark") { nav.navigate("support") { launchSingleTop = true } }
     }
 }
 
@@ -337,69 +332,40 @@ fun DeviceScreen() {
 @Composable
 fun SupportScreen(vm: AppViewModel) {
     val ctx = LocalContext.current
-    val faq = listOf(
-        "Gemini key kahan se milti hai?" to "aistudio.google.com/apikey par free key banao, phir AI Brain mein paste karke Save & Test dabao.",
-        "Jawab nahi aa raha / 503 error?" to "Google ka server kabhi vyast hota hai. Ek-do baar dobara try karo ya AI Brain mein doosra model chuno.",
-        "Awaaz achhi nahi lag rahi?" to "Settings → Voice mein pitch aur speed badlo, ya TTS settings se Google ki Hindi awaaz install karo.",
-        "App kholne ka command nahi chal raha?" to "App ka naam wahi bolo jo icon ke neeche likha hai. Phone Control tab mein bhi naam likhkar khol sakte ho.",
-        "Mic kaam nahi kar raha?" to "Settings → Permissions mein Microphone allow karo. Tab tak type karke bhi baat kar sakte ho."
-    )
-
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        Text(
-            "Help & Support",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold
-        )
-
-        Card(Modifier.fillMaxWidth()) {
+        Text("Help & Support", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Box(
+            Modifier.fillMaxWidth()
+                .background(
+                    Brush.linearGradient(listOf(Color(0xFF0B1026), Color(0xFF1B1B4B), Color(0xFF2E1B66))),
+                    RoundedCornerShape(26.dp)
+                )
+                .padding(24.dp)
+        ) {
             Column(
-                Modifier.fillMaxWidth().padding(18.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Text(
-                    "Creator Information",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    "Md Asmaul",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Text("📍 Village: Bhawanipur")
-                Text("District: Pakur")
-                Text("Jharkhand, India")
-
+                NeonAvatar(76.dp, "A")
+                Text("CREATOR", color = NeonCyan, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 3.sp)
+                Text("Md Asmaul", color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.Bold)
+                Text("Founder & Developer, Yesmin AI", color = Color(0xFFB8C0E0), fontSize = 14.sp)
+                Text("📍 Bhawanipur, Pakur", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                Text("Jharkhand, India", color = Color(0xFFB8C0E0), fontSize = 14.sp)
                 Button(
-                    onClick = {
-                        PhoneControl.whatsapp(ctx, "9321109411", "")
-                    },
-                    modifier = Modifier.fillMaxWidth()
+                    onClick = { PhoneControl.whatsapp(ctx, "9321109411", "") },
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF25D366), contentColor = Color.Black
+                    )
                 ) {
-                    Text("💬  Contact on WhatsApp")
+                    Text("💬  Contact on WhatsApp", fontWeight = FontWeight.Bold)
                 }
             }
         }
-
-        faq.forEach { (q, a) ->
-            Card(Modifier.fillMaxWidth()) {
-                Column(
-                    Modifier.fillMaxWidth().padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Text(q, fontWeight = FontWeight.Bold)
-                    Text(a, style = MaterialTheme.typography.bodyMedium)
-                }
-            }
-        }
-
-        Text(
-            "Yesmin AI personal prototype. Kaun si cheez kaam karti hai, FEATURES.md mein likha hai.",
-            style = MaterialTheme.typography.bodySmall
-        )
     }
 }

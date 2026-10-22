@@ -89,9 +89,9 @@ fun SettingsScreen(vm: AppViewModel, nav: NavHostController) {
     ) {
         Text("Settings", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
 
-        Section("Gemini API & Model") {
-            Text("Provider: Google Gemini · model: ${vm.model} · key: " + if (vm.hasKey) "saved" else "nahi")
-            OutlinedButton(onClick = { nav.navigate("brain") }) { Text("AI Brain kholo") }
+        Section("Yesmin") {
+            OutlinedButton(onClick = { nav.navigate("profiles") { launchSingleTop = true } }, modifier = Modifier.fillMaxWidth()) { Text("🎭 AI Personalities") }
+            OutlinedButton(onClick = { nav.navigate("device") { launchSingleTop = true } }, modifier = Modifier.fillMaxWidth()) { Text("📊 Device Info") }
         }
 
         Section("Profile") {

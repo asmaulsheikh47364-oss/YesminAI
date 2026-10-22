@@ -126,12 +126,11 @@ fun Bubble(m: ChatMsg, vm: AppViewModel) {
 fun HomeScreen(vm: AppViewModel, nav: NavHostController) {
     val ctx = LocalContext.current
     val micLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) { navTab(nav, "voice"); vm.startSession() } else vm.voiceDenied()
+        if (granted) vm.startSession() else vm.voiceDenied()
     }
     fun onMic() {
         if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-            navTab(nav, "voice")
-            vm.startSession()
+            if (vm.sessionActive) vm.stopSession() else vm.startSession()
         } else {
             micLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
@@ -143,16 +142,6 @@ fun HomeScreen(vm: AppViewModel, nav: NavHostController) {
         else -> "Good evening"
     }
     val title = if (vm.userName.isBlank()) greet else greet + ", " + vm.userName
-    val grid = listOf(
-        Triple("💬", "Chat", "chat"), Triple("🎤", "Voice", "voice"),
-        Triple("📱", "Apps & Phone", "apps"), Triple("🧠", "AI Brain", "brain"),
-        Triple("🗂", "Memory", "memory"), Triple("🛠", "AI Tools", "tools"),
-        Triple("📊", "Device Info", "device"), Triple("⚙️", "Settings", "settings"),
-        Triple("🎭", "Personalities", "profiles"), Triple("⏰", "Reminders", "reminders"),
-        Triple("🧮", "Calculator", "calc"), Triple("✉️", "Messages", "messages"),
-        Triple("🔒", "Privacy", "settings"), Triple("🛟", "Help", "support"),
-        Triple("📷", "Photo AI", "vision"), Triple("💻", "Coding", "tool/code_gen")
-    )
     val quick = listOf(
         "▶ YouTube music" to "youtube par music kholo",
         "🔋 Battery" to "battery kitni hai",
@@ -167,31 +156,6 @@ fun HomeScreen(vm: AppViewModel, nav: NavHostController) {
     ) {
         HomeHero(vm, title) { onMic() }
 
-        Card(onClick = { nav.navigate("brain") { launchSingleTop = true } }, modifier = Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("🧠 YESMIN AI BRAIN", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Text("Provider: Google Gemini · model: " + vm.model)
-                Text(if (vm.hasKey) "Key saved (encrypted). Test chalake status dekho." else "Key abhi nahi daali — yahan tap karo.")
-            }
-        }
-        grid.chunked(2).forEach { row ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                row.forEach { (icon, label, route) ->
-                    Card(
-                        onClick = {
-                            if (route == "chat" || route == "voice" || route == "apps") navTab(nav, route)
-                            else nav.navigate(route) { launchSingleTop = true }
-                        },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Column(Modifier.fillMaxWidth().padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(icon, fontSize = 28.sp)
-                            Text(label, fontWeight = FontWeight.Medium)
-                        }
-                    }
-                }
-            }
-        }
         Text("Quick commands", style = MaterialTheme.typography.titleMedium, modifier = Modifier.fillMaxWidth())
         quick.chunked(2).forEach { row ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

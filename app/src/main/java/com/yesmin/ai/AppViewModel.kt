@@ -465,7 +465,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun startSession() {
         if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             voiceDenied()
-            openRoute = "voice"
+            openRoute = "home"
             return
         }
         if (sessionActive && !sessionPaused) return

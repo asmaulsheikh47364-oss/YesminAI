@@ -2,6 +2,10 @@
 
 package com.yesmin.ai
 
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import android.content.Intent
 import android.os.Bundle
 import android.os.SystemClock
@@ -66,7 +70,7 @@ class MainActivity : ComponentActivity() {
         if (i == null) return
         i.getStringExtra("route")?.let { vm.openRoute = it }
         if (i.getBooleanExtra("start_session", false)) {
-            vm.openRoute = "voice"
+            vm.openRoute = "home"
             if (!(vm.lockEnabled && vm.locked)) vm.startSession()
         }
     }
@@ -151,11 +155,22 @@ fun MainScaffold(vm: AppViewModel) {
         }
     }
     val tabs = listOf(
-        Tab("home", "Home", "🏠"), Tab("chat", "Chat", "💬"), Tab("voice", "Voice", "🎤"),
-        Tab("brain", "AI Brain", "🧠"), Tab("more", "More", "☰")
+        Tab("home", "Home", "🏠"), Tab("chat", "Chat", "💬"), Tab("brain", "AI Brain", "🧠"), Tab("more", "More", "☰")
     )
-    val moreRoutes = setOf("more", "apps", "tools", "settings", "memory", "calc", "device", "support", "profiles", "reminders", "messages", "vision")
+    val moreRoutes = setOf("more", "apps", "calc", "support", "vision")
     Scaffold(
+        topBar = {
+            if (route == "home") {
+                androidx.compose.foundation.layout.Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.End
+                ) {
+                    androidx.compose.material3.IconButton(onClick = { nav.navigate("settings") { launchSingleTop = true } }) {
+                        Text("⚙️", fontSize = 22.sp)
+                    }
+                }
+            }
+        },
         snackbarHost = { SnackbarHost(snack) },
         bottomBar = {
             NavigationBar {
@@ -179,16 +194,12 @@ fun MainScaffold(vm: AppViewModel) {
             composable("apps") { AppsScreen(vm, nav) }
             composable("more") { MoreScreen(nav) }
             composable("brain") { BrainScreen(vm) }
-            composable("tools") { ToolsScreen(vm, nav) }
             composable("settings") { SettingsScreen(vm, nav) }
-            composable("tool/{id}") { e -> ToolScreen(vm, e.arguments?.getString("id") ?: "") }
             composable("memory") { MemoryScreen(vm) }
             composable("calc") { CalcScreen() }
             composable("device") { DeviceScreen() }
             composable("support") { SupportScreen(vm) }
             composable("profiles") { ProfilesScreen(vm) }
-            composable("reminders") { RemindersScreen(vm) }
-            composable("messages") { MessagesScreen(vm) }
             composable("vision") { VisionScreen(vm) }
         }
     }
