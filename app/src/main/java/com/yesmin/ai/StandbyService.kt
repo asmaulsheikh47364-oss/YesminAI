@@ -55,7 +55,7 @@ class StandbyService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
-        if (!alive) { alive = true; listen() }
+        if (!alive) { alive = true; Dbg.log(this, "standby chalu, sun raha hai"); listen() }
         return START_STICKY
     }
 
@@ -94,9 +94,10 @@ class StandbyService : Service() {
             override fun onBufferReceived(buffer: ByteArray?) {}
             override fun onEndOfSpeech() {}
             override fun onEvent(eventType: Int, params: Bundle?) {}
-            override fun onPartialResults(partialResults: Bundle?) { check(partialResults) }
-            override fun onResults(results: Bundle?) { if (!check(results)) again(300) }
+            override fun onPartialResults(partialResults: Bundle?) { Dbg.log(this@StandbyService, "partial: " + partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION), false); check(partialResults) }
+            override fun onResults(results: Bundle?) { Dbg.log(this@StandbyService, "suna: " + results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)); if (!check(results)) again(300) }
             override fun onError(error: Int) {
+                Dbg.log(this@StandbyService, "error " + error, error != 6 && error != 7)
                 if (error == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS) { shutdown(); return }
                 again(if (error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY) 1500L else 400L)
             }
@@ -133,7 +134,7 @@ class StandbyService : Service() {
             unmute()
             try {
                 val vm = (application as YesminApp).vm
-                if (!vm.sessionActive) vm.startSession() else if (vm.sessionPaused) vm.resumeSession()
+                Dbg.log(this, "wake! session shuru kar raha hoon"); if (!vm.sessionActive) vm.startSession() else if (vm.sessionPaused) vm.resumeSession()
             } catch (e: Exception) {}
             main.postDelayed({ stopSelf() }, 4000L)
         }

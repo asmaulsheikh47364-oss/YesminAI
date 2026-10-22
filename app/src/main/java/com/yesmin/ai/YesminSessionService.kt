@@ -12,6 +12,7 @@ class YesminSessionService : VoiceInteractionSessionService() {
 class YesminSession(ctx: Context) : VoiceInteractionSession(ctx) {
     override fun onShow(args: Bundle?, showFlags: Int) {
         super.onShow(args, showFlags)
+        Dbg.log(context, "power button: assistant session khula")
         try {
             val vm = (context.applicationContext as YesminApp).vm
             if (!vm.sessionActive) vm.startSession()

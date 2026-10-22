@@ -11,6 +11,7 @@ class YesminApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        try { Dbg.log(this, "app start; assistant=" + android.provider.Settings.Secure.getString(contentResolver, "assistant") + " | vis=" + android.provider.Settings.Secure.getString(contentResolver, "voice_interaction_service")) } catch (e: Exception) {}
         val old = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { t, e ->
             try {
