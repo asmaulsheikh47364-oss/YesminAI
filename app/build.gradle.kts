@@ -12,6 +12,7 @@ android {
         applicationId = "com.yesmin.ai"
         minSdk = 26
         targetSdk = 34
+        ndk { abiFilters += listOf("arm64-v8a") }
         versionCode = 2
         versionName = "1.0.1"
     }
