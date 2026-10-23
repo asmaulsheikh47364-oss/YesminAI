@@ -338,6 +338,34 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun runTermuxCommand(command: String) {
+        val cleaned = command.trim()
+        if (cleaned.isBlank()) {
+            reply("Kaunsa Termux command chalana hai?", false)
+            return
+        }
+        if (cleaned.contains("rm -rf") ||
+            cleaned.contains("mkfs") ||
+            cleaned.contains("format") ||
+            cleaned.contains("shutdown") ||
+            cleaned.contains("reboot")
+        ) {
+            reply("Yeh command risky hai. Ise direct execute nahi kiya.", false, true)
+            return
+        }
+        val ok = TermuxAgent.execute(
+            ctx,
+            cleaned,
+            "/data/data/com.termux/files/home/YesminAI"
+        )
+        reply(
+            if (ok) "Termux ko command bhej di. Command ka actual result abhi verify nahi hua."
+            else "Termux command nahi bhej payi. Termux RUN_COMMAND permission/configuration check karni hogi.",
+            false,
+            !ok
+        )
+    }
+
     private fun handleA11y(a: A11yAction, speak: Boolean) {
         if (!YesminAccessibilityService.isRunning()) {
             reply("Screen control ke liye pehle Accessibility service on karni hogi: Settings tab → Permissions.", speak)
@@ -419,6 +447,21 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Runs a phone command spoken in a Live voice call. Returns a plain result for Gemini to say; nothing is shown on screen. */
     fun liveCommand(text: String, confirmed: Boolean): String {
+
+        // JASMINE_TERMUX_ROUTE
+        val termuxRequest = text.trim()
+        if (termuxRequest.startsWith("termux:", ignoreCase = true)) {
+            if (!confirmed) {
+                return "Termux command chalane se pehle confirmation zaroori hai."
+            }
+            val shellCommand = termuxRequest.substringAfter(":").trim()
+            if (shellCommand.isBlank()) {
+                return "Termux command khaali hai."
+            }
+            runTermuxCommand(shellCommand)
+            return "Termux command bhejne ki request process hui; actual result abhi verify nahi hua."
+        }
+
         val cmd = CommandRouter.parse(text)
         return try {
             when (cmd) {
