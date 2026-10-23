@@ -2,6 +2,9 @@ package com.yesmin.ai
 
 import android.accessibilityservice.AccessibilityService
 import android.content.Intent
+import android.content.ComponentName
+import android.content.Context
+import android.provider.Settings
 import android.os.Bundle
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
@@ -15,6 +18,30 @@ class YesminAccessibilityService : AccessibilityService() {
     companion object {
         @Volatile var instance: YesminAccessibilityService? = null
         fun isRunning(): Boolean = instance != null
+
+        fun isEnabledInSettings(context: Context): Boolean {
+            return try {
+                val enabled = Settings.Secure.getString(
+                    context.contentResolver,
+                    Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+                ) ?: return false
+
+                val expected = ComponentName(
+                    context,
+                    YesminAccessibilityService::class.java
+                ).flattenToString()
+
+                enabled.split(':').any { it.equals(expected, ignoreCase = true) }
+            } catch (_: Exception) {
+                false
+            }
+        }
+
+        fun status(context: Context): String = when {
+            isRunning() -> "CONNECTED"
+            isEnabledInSettings(context) -> "ENABLED_NOT_CONNECTED"
+            else -> "DISABLED"
+        }
     }
 
     override fun onServiceConnected() { instance = this }

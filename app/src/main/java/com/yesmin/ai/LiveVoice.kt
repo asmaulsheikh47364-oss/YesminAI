@@ -201,8 +201,12 @@ class LiveVoice(
                     }
                     val result = when (nm) {
                         "get_current_time" -> f.format(java.util.Date()) + " IST"
-                        "read_screen" -> YesminAccessibilityService.instance?.dumpScreen() ?: "Accessibility service on nahi hai. Settings mein Yesmin AI ko Accessibility mein on karna padega."
-                        "recent_activity" -> YesminAccessibilityService.instance?.recentActivity() ?: "Accessibility service on nahi hai."
+                        "read_screen" -> YesminAccessibilityService.instance?.dumpScreen() ?: if (YesminAccessibilityService.isEnabledInSettings(context)) "Accessibility Android Settings mein ON hai, lekin Jasmine service abhi connect nahi hai. Screen abhi read nahi ho pa rahi." else "Accessibility Android Settings mein OFF dikh rahi hai."
+                        "recent_activity" -> YesminAccessibilityService.instance?.recentActivity()
+                            ?: if (YesminAccessibilityService.isEnabledInSettings(context))
+                                "Accessibility Android Settings mein ON hai, lekin Jasmine service abhi connect nahi hai."
+                            else
+                                "Accessibility Android Settings mein OFF dikh rahi hai."
                         else -> "ok, now say one very short goodbye line"
                     }
                     resp.put(JSONObject().put("id", c.optString("id")).put("name", nm)

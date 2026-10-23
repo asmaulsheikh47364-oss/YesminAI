@@ -427,7 +427,14 @@ fun runTermuxCommand(command: String) {
 
     private fun handleA11y(a: A11yAction, speak: Boolean) {
         if (!YesminAccessibilityService.isRunning()) {
-            reply("Screen control ke liye pehle Accessibility service on karni hogi: Settings tab → Permissions.", speak)
+            val a11yStatus = YesminAccessibilityService.status(ctx)
+            val message = when (a11yStatus) {
+                "ENABLED_NOT_CONNECTED" ->
+                    "Accessibility Android Settings mein ON hai, lekin Jasmine ki service abhi connect nahi hui. Service reconnect hone ka intezar karein; main ise OFF nahi bataungi."
+                else ->
+                    "Accessibility Android Settings mein OFF dikh rahi hai. Aapki setting badalne ki koshish nahi ki gayi."
+            }
+            reply(message, speak)
             return
         }
         if (a is A11yAction.Tap && CommandRouter.isConsequential(a.label)) {
@@ -607,7 +614,12 @@ fun runTermuxCommand(command: String) {
                 is Command.A11y -> {
                     val a = cmd.action
                     if (!YesminAccessibilityService.isRunning()) {
-                        "The Accessibility service is off. The user must switch on Yesmin AI in the phone's Accessibility settings."
+                        when (YesminAccessibilityService.status(ctx)) {
+                            "ENABLED_NOT_CONNECTED" ->
+                                "Accessibility is enabled in Android settings, but Jasmine's service is not connected yet. Do not claim it is off; screen actions are unavailable until it connects."
+                            else ->
+                                "Accessibility appears disabled in Android settings. Do not claim a screen action succeeded."
+                        }
                     } else if (a is A11yAction.Tap && CommandRouter.isConsequential(a.label) && !confirmed) {
                         "CONFIRMATION REQUIRED: tapping '" + a.label + "' may send, pay or delete something. Ask the user to confirm. Only after a clear yes, call phone_command again with the same command and confirmed=true."
                     } else if (YesminAccessibilityService.instance?.perform(a) == true) {
