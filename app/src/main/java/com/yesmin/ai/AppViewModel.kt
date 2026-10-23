@@ -359,14 +359,25 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         return buildString {
             append("Termux result: ")
             append(if (exitCode == 0) "success" else "exit code $exitCode")
-            if (stdout.isNotBlank()) append("\\nOutput: $stdout")
-            if (stderr.isNotBlank()) append("\\nError: $stderr")
-            if (errorMessage.isNotBlank()) append("\\nDetails: $errorMessage")
+            if (stdout.isNotBlank()) append("\nOutput: $stdout")
+            if (stderr.isNotBlank()) append("\nError: $stderr")
+            if (errorMessage.isNotBlank()) append("\nDetails: $errorMessage")
         }.take(3000)
     }
 
 fun runTermuxCommand(command: String) {
         val cleaned = command.trim()
+        if (cleaned.equals("clear", ignoreCase = true) ||
+            cleaned.equals("termux clear", ignoreCase = true)) {
+            val opened = TermuxAgent.openTerminal(ctx)
+            reply(
+                if (opened) "Termux mein naya terminal kholkar screen clear karne ki request bheji."
+                else "Termux terminal nahi khul saka. RUN_COMMAND permission aur allow-external-apps check karein.",
+                true,
+                !opened
+            )
+            return
+        }
         if (cleaned.isBlank()) {
             reply("Kaunsa Termux command chalana hai?", false)
             return

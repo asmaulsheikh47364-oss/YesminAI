@@ -70,4 +70,35 @@ object TermuxAgent {
             false
         }
     }
+
+    fun openTerminal(
+        context: Context,
+        command: String = "clear; exec bash -l"
+    ): Boolean {
+        if (!isAvailable(context)) return false
+
+        val intent = Intent("com.termux.RUN_COMMAND").apply {
+            setClassName("com.termux", "com.termux.app.RunCommandService")
+            putExtra(
+                "com.termux.RUN_COMMAND_PATH",
+                "/data/data/com.termux/files/usr/bin/bash"
+            )
+            putExtra(
+                "com.termux.RUN_COMMAND_ARGUMENTS",
+                arrayOf("-lc", command)
+            )
+            putExtra(
+                "com.termux.RUN_COMMAND_WORKDIR",
+                "/data/data/com.termux/files/home/YesminAI"
+            )
+            putExtra("com.termux.RUN_COMMAND_BACKGROUND", false)
+        }
+
+        return try {
+            context.startService(intent)
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
 }
