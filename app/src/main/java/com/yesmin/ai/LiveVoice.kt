@@ -1,5 +1,6 @@
 package com.yesmin.ai
 
+import android.content.Context
 import android.annotation.SuppressLint
 import android.media.AudioAttributes
 import android.media.AudioFormat
@@ -22,6 +23,7 @@ import java.util.concurrent.TimeUnit
 
 /** Real-time voice chat over the Gemini Live API: 16 kHz mic in, 24 kHz voice out. */
 class LiveVoice(
+    private val context: Context,
     private val onState: (VoiceState) -> Unit,
     private val onUserText: (String) -> Unit,
     private val onModelText: (String) -> Unit,

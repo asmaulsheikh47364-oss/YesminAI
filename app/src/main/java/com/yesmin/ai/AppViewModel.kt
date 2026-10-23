@@ -750,6 +750,7 @@ fun runTermuxCommand(command: String) {
             if (!sessionActive || sessionPaused) return@launch
             live?.stop()
             val lv = LiveVoice(
+                context = ctx,
                 onState = { if (sessionActive && !sessionPaused) voiceState = it },
                 onUserText = { liveLog.add(ChatMsg(true, it)); if (liveLog.size > 200) liveLog.removeAt(0) },
                 onModelText = { liveLog.add(ChatMsg(false, it)); if (liveLog.size > 200) liveLog.removeAt(0); autoRemember() },
