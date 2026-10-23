@@ -147,6 +147,12 @@ class LiveVoice(
             ready = true
             startPlayer()
             startMic()
+            if (reconnects == 0) {
+                try {
+                    ws?.send(JSONObject().put("realtimeInput", JSONObject().put("text", "The user just woke you by calling your name. Reply right now with one very short, warm greeting in your own words (different each time, for example telling him to go ahead and speak), then wait.")).toString())
+                } catch (e: Exception) {
+                }
+            }
             post { onState(VoiceState.Listening) }
             return
         }

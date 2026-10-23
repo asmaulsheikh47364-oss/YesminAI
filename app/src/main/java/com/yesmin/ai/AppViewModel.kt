@@ -982,12 +982,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Quietly turns lasting facts from recent chat into saved notes. */
     private fun autoRemember(force: Boolean = false) {
-        if (!memoryEnabled || tempMode || !disclosure || extracting) return
+        Dbg.log(ctx, "remember: force=" + force + " mem=" + memoryEnabled + " temp=" + tempMode + " disc=" + disclosure + " busy=" + extracting, false)
+        if (!memoryEnabled || tempMode || extracting) return
         val key = prefs.apiKey ?: return
         val all = (messages + liveLog).filter { !it.error }
         if (all.size < lastExtractCount) lastExtractCount = 0
         val fresh = all.size - lastExtractCount
-        if (fresh < (if (force) 2 else 8)) return
+        if (fresh < (if (force) 1 else 4)) return
         val chunk = all.takeLast(minOf(fresh, 24))
         val known = memories.take(40).map { it.text }
         val sys = "You write long-term memory notes about the user from a chat. " +
