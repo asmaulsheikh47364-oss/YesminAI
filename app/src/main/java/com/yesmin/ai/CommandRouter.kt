@@ -28,6 +28,8 @@ sealed class Command {
     data class Reply(val text: String) : Command()
     /** Voice session control: pause | resume | stop | stopspeak. */
     data class Voice(val action: String) : Command()
+    /** Media key press: play | pause | next | previous. */
+    data class Media(val action: String) : Command()
     object Battery : Command()
     object Time : Command()
     object Network : Command()
@@ -121,7 +123,7 @@ object CommandRouter {
 
         if (t.size <= 5) {
             if (t == listOf("stop") || ("stop" in t && "speaking" in t)) return Command.Voice("stopspeak")
-            if (t.any { it in setOf("pause", "ruko", "rukiye") } && t.none { it in setOf("video", "song", "music", "gaana", "gaane") }) return Command.Voice("pause")
+            if (t.any { it in setOf("pause", "ruko", "rukiye") } && t.none { it in setOf("video", "song", "songs", "music", "gaana", "gaane", "gana", "track") }) return Command.Voice("pause")
             if ("resume" in t || ("dobara" in t && "shuru" in t)) return Command.Voice("resume")
             if (("stop" in t || "band" in t) && t.any { it in setOf("listening", "session") }) return Command.Voice("stop")
         }
@@ -199,6 +201,16 @@ object CommandRouter {
             if (t.any { it in setOf("time", "samay", "date", "tarikh", "baje") }) return Command.Time
             if (t.any { it in setOf("internet", "wifi", "network") }) return Command.Network
             if (t.any { it in setOf("device", "model") } || ("android" in t && "version" in t)) return Command.DeviceInfo
+        }
+
+        val songish = t.any { it in setOf("song", "songs", "gaana", "gaane", "gana", "music", "track", "video") }
+        if (t.size <= 5 && songish) {
+            when {
+                t.any { it in setOf("next", "agla", "agli", "skip") } -> return Command.Media("next")
+                t.any { it in setOf("previous", "prev", "pichla", "pichhla") } -> return Command.Media("previous")
+                t.any { it in setOf("pause", "ruko", "roko", "rok", "stop") } -> return Command.Media("pause")
+                t.any { it in setOf("resume", "dobara", "phirse") } -> return Command.Media("play")
+            }
         }
 
         val wantsSongs = t.any { it in songWords }

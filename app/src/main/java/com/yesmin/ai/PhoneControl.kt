@@ -59,6 +59,23 @@ object PhoneControl {
     }
 
     /** Opens the dialer with the number filled in; the user presses the green call button. */
+    /** Sends a media key to whatever player is active. Android gives no confirmation that it worked. */
+    fun media(ctx: Context, action: String): Boolean = try {
+        val code = when (action) {
+            "next" -> android.view.KeyEvent.KEYCODE_MEDIA_NEXT
+            "previous" -> android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS
+            "pause" -> android.view.KeyEvent.KEYCODE_MEDIA_PAUSE
+            "play" -> android.view.KeyEvent.KEYCODE_MEDIA_PLAY
+            else -> android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
+        }
+        val am = ctx.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
+        am.dispatchMediaKeyEvent(android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, code))
+        am.dispatchMediaKeyEvent(android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, code))
+        true
+    } catch (e: Exception) {
+        false
+    }
+
     fun dial(ctx: Context, number: String): Boolean = go(ctx, Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + Uri.encode(number))))
 
     /** Opens the SMS app with the message written; the user presses Send. */

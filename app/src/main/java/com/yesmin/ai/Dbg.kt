@@ -7,7 +7,7 @@ import android.widget.Toast
 import java.io.File
 
 object Dbg {
-    fun log(ctx: Context, msg: String, toast: Boolean = true) {
+    fun log(ctx: Context, msg: String, toast: Boolean = false) {
         try {
             val dir = ctx.getExternalFilesDir(null) ?: ctx.filesDir
             val f = File(dir, "debug.txt")

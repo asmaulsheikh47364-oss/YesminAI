@@ -27,7 +27,8 @@ class LiveVoice(
     private val onModelText: (String) -> Unit,
     private val onLevel: (Float) -> Unit,
     private val onError: (String) -> Unit,
-    private val onCommand: (String) -> Unit = {}
+    private val onCommand: (String) -> Unit = {},
+    private val onTool: (String, Boolean) -> String = { _, _ -> "not supported" }
 ) {
     private val ui = Handler(Looper.getMainLooper())
     private val http = OkHttpClient.Builder()
@@ -103,6 +104,16 @@ class LiveVoice(
         return true
     }
 
+    private fun phoneTool(): JSONObject {
+        val props = JSONObject()
+            .put("command", JSONObject().put("type", "STRING").put("description", "The user's request as a short Roman Hindi phone command, e.g. torch on karo, volume badhao, youtube kholo, gaana pause karo, rahul ko call karo."))
+            .put("confirmed", JSONObject().put("type", "BOOLEAN").put("description", "true only after the user clearly said yes to a CONFIRMATION REQUIRED question, otherwise false."))
+        return JSONObject()
+            .put("name", "phone_command")
+            .put("description", "Controls the phone: opens apps, YouTube search, music keys (play, pause, next, previous), torch, volume, battery, Wi-Fi/Bluetooth settings, Do Not Disturb, calculator, back/home/scroll/tap, calls and messages (these need confirmation). Returns what really happened.")
+            .put("parameters", JSONObject().put("type", "OBJECT").put("properties", props).put("required", JSONArray().put("command")))
+    }
+
     private fun fail(msg: String) {
         stop()
         post { onError(msg) }
@@ -135,7 +146,7 @@ class LiveVoice(
             .put("outputAudioTranscription", JSONObject())
             .put("tools", JSONArray()
                 .also { if (useSearch) it.put(JSONObject().put("googleSearch", JSONObject())) }
-                .put(JSONObject().put("functionDeclarations", JSONArray().put(JSONObject().put("name", "read_screen").put("description", "Returns the text currently visible on the user phone screen. Call it whenever the user asks what is on the screen, asks you to read or explain something shown, or says this or here about something on screen.")).put(JSONObject().put("name", "recent_activity").put("description", "Returns what the user recently did on the phone (taps and screens opened). Call it when the user asks what they just did or what happened.")).put(JSONObject().put("name", "stop_assistant").put("description", "Fully switch Yesmin off. Call it only when the user says her name (Yesmin) and tells her to stop, close or switch off. Say one short goodbye line in the same turn.")).put(JSONObject().put("name", "pause_assistant").put("description", "Make Yesmin quiet for a while. Call it only when the user says her name (Yesmin) and asks her to be quiet or pause for some time. Say one short line like okay in the same turn.")).put(
+                .put(JSONObject().put("functionDeclarations", JSONArray().put(phoneTool()).put(JSONObject().put("name", "read_screen").put("description", "Returns the text currently visible on the user phone screen. Call it whenever the user asks what is on the screen, asks you to read or explain something shown, or says this or here about something on screen.")).put(JSONObject().put("name", "recent_activity").put("description", "Returns what the user recently did on the phone (taps and screens opened). Call it when the user asks what they just did or what happened.")).put(JSONObject().put("name", "stop_assistant").put("description", "Fully switch Yesmin off. Call it only when the user says her name (Yesmin) and tells her to stop, close or switch off. Say one short goodbye line in the same turn.")).put(JSONObject().put("name", "pause_assistant").put("description", "Make Yesmin quiet for a while. Call it only when the user says her name (Yesmin) and asks her to be quiet or pause for some time. Say one short line like okay in the same turn.")).put(
                     JSONObject().put("name", "get_current_time")
                         .put("description", "Returns the exact current date and time in India (IST). Call it every time the user asks the time or date.")))))
         return JSONObject().put("setup", setup).toString()
@@ -165,6 +176,19 @@ class LiveVoice(
                     val f = java.text.SimpleDateFormat("EEEE, d MMMM yyyy, h:mm a", java.util.Locale.ENGLISH)
                     f.timeZone = java.util.TimeZone.getTimeZone("Asia/Kolkata")
                     val nm = c.optString("name")
+                    if (nm == "phone_command") {
+                        val callId = c.optString("id")
+                        val args = c.optJSONObject("args")
+                        val cmdText = args?.optString("command") ?: ""
+                        val conf = args?.optBoolean("confirmed", false) ?: false
+                        post {
+                            val res = try { onTool(cmdText, conf) } catch (e: Exception) { "The command failed." }
+                            val one = JSONArray().put(JSONObject().put("id", callId).put("name", "phone_command")
+                                .put("response", JSONObject().put("result", res)))
+                            ws?.send(JSONObject().put("toolResponse", JSONObject().put("functionResponses", one)).toString())
+                        }
+                        continue
+                    }
                     if (nm == "stop_assistant" || nm == "pause_assistant") {
                         closeMode = if (nm == "stop_assistant") "stop" else "pause"
                         if (quiet) {
@@ -184,7 +208,7 @@ class LiveVoice(
                     resp.put(JSONObject().put("id", c.optString("id")).put("name", nm)
                         .put("response", JSONObject().put("result", result)))
                 }
-                ws?.send(JSONObject().put("toolResponse", JSONObject().put("functionResponses", resp)).toString())
+                if (resp.length() > 0) ws?.send(JSONObject().put("toolResponse", JSONObject().put("functionResponses", resp)).toString())
             }
             return
         }

@@ -310,6 +310,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 reply(if (v == null) "Yeh hisaab main samajh nahi paayi." else "${cmd.expr.trim()} = ${Calculator.format(v)}", speak)
             }
             is Command.A11y -> handleA11y(cmd.action, speak)
+            is Command.Media -> {
+                val ok = PhoneControl.media(ctx, cmd.action)
+                reply(if (ok) "Theek hai, media key bhej di." else "Media control nahi ho paya.", speak)
+            }
             Command.None -> {}
         }
     }
@@ -413,6 +417,112 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun speakText(text: String) { speakWith(text) }
 
+    /** Runs a phone command spoken in a Live voice call. Returns a plain result for Gemini to say; nothing is shown on screen. */
+    fun liveCommand(text: String, confirmed: Boolean): String {
+        val cmd = CommandRouter.parse(text)
+        return try {
+            when (cmd) {
+                is Command.OpenApp -> when (val r = AppLauncher.open(ctx, cmd.name)) {
+                    is AppLauncher.R.Opened -> "Opened " + r.label + "."
+                    is AppLauncher.R.Ambiguous -> "More than one app matches: " + r.labels.joinToString(", ") + ". Ask the user which one."
+                    is AppLauncher.R.Failed -> "Could not open the app: " + r.msg
+                    else -> "No app named '" + cmd.name + "' was found on this phone."
+                }
+                is Command.YouTube -> {
+                    val q = if (cmd.query.isBlank()) "music" else cmd.query
+                    if (AppLauncher.openYouTube(ctx, q)) {
+                        logAction("YouTube search: " + q)
+                        "Opened the YouTube search for '" + q + "'. The user has to tap the song to play it."
+                    } else {
+                        "Could not open YouTube."
+                    }
+                }
+                is Command.Media -> {
+                    if (PhoneControl.media(ctx, cmd.action)) "Sent the " + cmd.action + " media key. Android does not confirm whether a player reacted."
+                    else "Could not send the media key."
+                }
+                is Command.Torch -> {
+                    if (PhoneControl.torch(ctx, cmd.on)) {
+                        logAction(if (cmd.on) "Torch on" else "Torch off")
+                        if (cmd.on) "Torch is on." else "Torch is off."
+                    } else {
+                        "This phone has no torch or Android blocked it."
+                    }
+                }
+                is Command.Volume -> PhoneControl.volume(ctx, cmd.action, cmd.percent).first
+                is Command.OpenPanel -> {
+                    val name = if (cmd.page == "wifi") "Wi-Fi" else "Bluetooth"
+                    if (PhoneControl.openSettings(ctx, cmd.page)) "Opened the $name settings. Android does not let apps switch it, so the user must flip the switch."
+                    else "Could not open the $name settings."
+                }
+                is Command.Dnd -> PhoneControl.dnd(ctx, cmd.on)
+                Command.Battery -> PhoneInfo.battery(ctx)
+                Command.Time -> PhoneInfo.time()
+                Command.Network -> PhoneInfo.network(ctx)
+                Command.DeviceInfo -> PhoneInfo.device()
+                is Command.Calc -> {
+                    val v = Calculator.eval(cmd.expr)
+                    if (v == null) "That calculation could not be understood." else cmd.expr.trim() + " = " + Calculator.format(v)
+                }
+                is Command.Call -> {
+                    if (!confirmed) {
+                        "CONFIRMATION REQUIRED: the user wants to call '" + cmd.target + "'. Ask one short question to confirm. Only after a clear yes, call phone_command again with the same command and confirmed=true."
+                    } else {
+                        when (val w = resolveWho(cmd.target)) {
+                            is Who.Ask -> w.text
+                            is Who.Ok -> {
+                                if (PhoneControl.dial(ctx, w.number)) {
+                                    logAction("Dial: " + w.name)
+                                    "The dialer is open with " + w.name + ". The user has to press the green call button."
+                                } else {
+                                    "The dialer could not be opened."
+                                }
+                            }
+                        }
+                    }
+                }
+                is Command.Message -> {
+                    if (cmd.body.isBlank()) {
+                        "Ask the user what the message should say."
+                    } else if (!confirmed) {
+                        "CONFIRMATION REQUIRED: send a " + cmd.channel + " message to '" + cmd.name + "' saying '" + cmd.body + "'. Read it back in one short sentence and ask. Only after a clear yes, call phone_command again with the same command and confirmed=true. The app only opens the draft; the user presses Send."
+                    } else {
+                        when (val w = resolveWho(cmd.name)) {
+                            is Who.Ask -> w.text
+                            is Who.Ok -> {
+                                val wa = cmd.channel == "whatsapp"
+                                val ok = if (wa) PhoneControl.whatsapp(ctx, w.number, cmd.body) else PhoneControl.sms(ctx, w.number, cmd.body)
+                                if (ok) {
+                                    logAction((if (wa) "WhatsApp" else "SMS") + " draft: " + w.name)
+                                    "The message to " + w.name + " is written in the app. The user has to press Send."
+                                } else {
+                                    "The messaging app could not be opened."
+                                }
+                            }
+                        }
+                    }
+                }
+                is Command.A11y -> {
+                    val a = cmd.action
+                    if (!YesminAccessibilityService.isRunning()) {
+                        "The Accessibility service is off. The user must switch on Yesmin AI in the phone's Accessibility settings."
+                    } else if (a is A11yAction.Tap && CommandRouter.isConsequential(a.label) && !confirmed) {
+                        "CONFIRMATION REQUIRED: tapping '" + a.label + "' may send, pay or delete something. Ask the user to confirm. Only after a clear yes, call phone_command again with the same command and confirmed=true."
+                    } else if (YesminAccessibilityService.instance?.perform(a) == true) {
+                        "Done."
+                    } else {
+                        "That could not be done (the element was not found or the screen is protected)."
+                    }
+                }
+                is Command.Voice -> "Use stop_assistant or pause_assistant for that."
+                Command.None -> "That was not understood as a phone command. Ask the user to say it again in a simpler way."
+                else -> "That action is not available in a voice call."
+            }
+        } catch (e: Exception) {
+            "The command failed: " + (e.message ?: "unknown error")
+        }
+    }
+
     fun stopSpeaking() { voice.stopSpeaking(); pcm.stop(); afterTurn() }
 
     // ---------- continuous voice session ----------
@@ -511,7 +621,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val p = activeProfile()
         val mem = if (memoryEnabled && !tempMode) memories.filter { it.category != "snippet" }.take(30).map { it.text } else emptyList()
         val system = Personas.chatSystem(persona, language, mem, p.name, p.tone) +
-            " This is a live voice call: reply in short spoken sentences, no markdown, no lists. You can see the user's phone screen: call read_screen whenever they ask what is on the screen, ask you to read, explain or help with something shown, or say this or here; call recent_activity when they ask what they just did. Describe what you find in simple spoken words and never read out passwords or OTPs. Only if the user says your name (Yesmin) together with a command: when told to stop, close or switch off, say one short line like okay I am switching off and call stop_assistant; when told to be quiet or pause for some time, say one short okay and call pause_assistant. Never do this without your name being said."
+            " This is a live voice call: reply in short spoken sentences, no markdown, no lists. You can see the user's phone screen: call read_screen whenever they ask what is on the screen, ask you to read, explain or help with something shown, or say this or here; call recent_activity when they ask what they just did. Describe what you find in simple spoken words and never read out passwords or OTPs. In this live call you CAN control the phone, but only through the phone_command function (the earlier rule that you cannot control the phone does not apply here). Pass the user's request as a short Roman Hindi command, for example: 'torch on karo', 'torch off karo', 'volume badhao', 'volume kam karo', 'volume 50', 'youtube kholo', 'whatsapp kholo', 'arijit singh ke gaane youtube par chalao', 'gaana pause karo', 'next gaana', 'pichla gaana', 'rahul ko call karo', 'rahul ko whatsapp bhejo: kal milte hain', 'wifi on karo', 'battery kitni hai', 'back jao', 'home jao', 'scroll neeche'. Say you did something only if the function result confirms it, and report the result honestly (for example when the user still has to tap or press a button). If the result starts with CONFIRMATION REQUIRED, ask the user in one short sentence and call the function again with confirmed=true only after a clear yes. Never place calls, send messages or do anything that sends, pays or deletes without that confirmation. If the user asks what you or the app can do, answer from ABOUT YOURSELF. Only if the user says your name (Yesmin) together with a command: when told to stop, close or switch off, say one short line like okay I am switching off and call stop_assistant; when told to be quiet or pause for some time, say one short okay and call pause_assistant. Never do this without your name being said."
         voiceState = VoiceState.Connecting
         viewModelScope.launch {
             val all = gemini.liveModels(key).filter { !it.contains("translate", true) }
@@ -530,6 +640,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 onUserText = { liveLog.add(ChatMsg(true, it)); if (liveLog.size > 200) liveLog.removeAt(0) },
                 onModelText = { liveLog.add(ChatMsg(false, it)); if (liveLog.size > 200) liveLog.removeAt(0); autoRemember() },
                 onLevel = { micLevel = it },
+                onTool = { c, ok -> liveCommand(c, ok) },
                 onCommand = { c -> if (c == "stop") { try { StandbyService.start(ctx) } catch (e: Exception) {}; stopSession() } else { live?.quiet = true; voiceState = VoiceState.Listening } },
                 onError = { msg ->
                     messages.add(ChatMsg(false, msg, true))
