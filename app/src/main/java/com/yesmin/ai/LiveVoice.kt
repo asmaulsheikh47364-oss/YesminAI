@@ -106,11 +106,11 @@ class LiveVoice(
 
     private fun phoneTool(): JSONObject {
         val props = JSONObject()
-            .put("command", JSONObject().put("type", "STRING").put("description", "The user's request as a short Roman Hindi phone command, e.g. torch on karo, volume badhao, youtube kholo, gaana pause karo, rahul ko call karo."))
+            .put("command", JSONObject().put("type", "STRING").put("description", "Short Roman Hindi phone command. Open Termux UI: termux kholo. If the user explicitly asks to execute a shell command in Termux, first ask them to confirm the exact command; only after a clear yes, call this tool with command exactly in the form termux:<shell command>, for example termux:pwd, and confirmed=true. Never execute an inferred or unconfirmed shell command. Normal phone commands include torch on karo, volume badhao, youtube kholo."))
             .put("confirmed", JSONObject().put("type", "BOOLEAN").put("description", "true only after the user clearly said yes to a CONFIRMATION REQUIRED question, otherwise false."))
         return JSONObject()
             .put("name", "phone_command")
-            .put("description", "Controls the phone: opens apps, YouTube search, music keys (play, pause, next, previous), torch, volume, battery, Wi-Fi/Bluetooth settings, Do Not Disturb, calculator, back/home/scroll/tap, calls and messages (these need confirmation). Returns what really happened.")
+            .put("description", "Controls the phone and can launch Termux. For Termux shell execution, ask for explicit confirmation of the exact command first, then use command=termux:<exact shell command> and confirmed=true. For opening the Termux app UI use command=termux kholo. Never claim shell output was verified; the bridge currently reports only whether the request was sent. Calls, messages and other consequential actions require confirmation.")
             .put("parameters", JSONObject().put("type", "OBJECT").put("properties", props).put("required", JSONArray().put("command")))
     }
 

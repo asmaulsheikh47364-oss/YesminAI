@@ -27,6 +27,17 @@ object AppLauncher {
     )
 
     fun open(ctx: Context, name: String): R {
+        if (name.trim().equals("termux", ignoreCase = true)) {
+            val intent = ctx.packageManager.getLaunchIntentForPackage("com.termux")
+                ?: return R.NotFound
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            return try {
+                ctx.startActivity(intent)
+                R.Opened("Termux")
+            } catch (e: Exception) {
+                R.Failed(e.javaClass.simpleName)
+            }
+        }
         val pm = ctx.packageManager
         val q = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
         val apps = try {

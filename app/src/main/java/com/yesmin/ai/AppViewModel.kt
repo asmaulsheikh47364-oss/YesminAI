@@ -338,7 +338,34 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun runTermuxCommand(command: String) {
+
+    private fun readTermuxCommandResult(): String {
+        val prefs = ctx.getSharedPreferences(
+            "termux_command_results",
+            android.content.Context.MODE_PRIVATE
+        )
+
+        if (!prefs.getBoolean("result_received", false)) {
+            return "Termux ne abhi command ka result nahi bheja."
+        }
+
+        val stdout = prefs.getString("stdout", "").orEmpty().trim()
+        val stderr = prefs.getString("stderr", "").orEmpty().trim()
+        val exitCode = prefs.getInt("exit_code", -1)
+        val errorMessage = prefs.getString("error_message", "").orEmpty().trim()
+
+        prefs.edit().putBoolean("result_received", false).apply()
+
+        return buildString {
+            append("Termux result: ")
+            append(if (exitCode == 0) "success" else "exit code $exitCode")
+            if (stdout.isNotBlank()) append("\\nOutput: $stdout")
+            if (stderr.isNotBlank()) append("\\nError: $stderr")
+            if (errorMessage.isNotBlank()) append("\\nDetails: $errorMessage")
+        }.take(3000)
+    }
+
+fun runTermuxCommand(command: String) {
         val cleaned = command.trim()
         if (cleaned.isBlank()) {
             reply("Kaunsa Termux command chalana hai?", false)
@@ -353,17 +380,38 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             reply("Yeh command risky hai. Ise direct execute nahi kiya.", false, true)
             return
         }
+
+        val prefs = ctx.getSharedPreferences(
+            "termux_command_results",
+            android.content.Context.MODE_PRIVATE
+        )
+        prefs.edit().putBoolean("result_received", false).apply()
+
         val ok = TermuxAgent.execute(
             ctx,
             cleaned,
             "/data/data/com.termux/files/home/YesminAI"
         )
-        reply(
-            if (ok) "Termux ko command bhej di. Command ka actual result abhi verify nahi hua."
-            else "Termux command nahi bhej payi. Termux RUN_COMMAND permission/configuration check karni hogi.",
-            false,
-            !ok
-        )
+        if (!ok) {
+            reply("Termux command nahi bhej payi. Termux RUN_COMMAND permission/configuration check karein.", false, true)
+            return
+        }
+
+        reply("Termux mein command bhej di. Result aane ka intezar hai.", false)
+
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+            var waited = 0
+            while (waited < 15000 && !prefs.getBoolean("result_received", false)) {
+                kotlinx.coroutines.delay(250)
+                waited += 250
+            }
+            val result = if (prefs.getBoolean("result_received", false)) {
+                readTermuxCommandResult()
+            } else {
+                "Termux se abhi result nahi mila. Permission aur Termux notification/background execution check karein."
+            }
+            reply(result, true, !result.contains("success"))
+        }
     }
 
     private fun handleA11y(a: A11yAction, speak: Boolean) {
@@ -664,7 +712,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val p = activeProfile()
         val mem = if (memoryEnabled && !tempMode) memories.filter { it.category != "snippet" }.take(30).map { it.text } else emptyList()
         val system = Personas.chatSystem(persona, language, mem, p.name, p.tone) +
-            " This is a live voice call: reply in short spoken sentences, no markdown, no lists. You can see the user's phone screen: call read_screen whenever they ask what is on the screen, ask you to read, explain or help with something shown, or say this or here; call recent_activity when they ask what they just did. Describe what you find in simple spoken words and never read out passwords or OTPs. In this live call you CAN control the phone, but only through the phone_command function (the earlier rule that you cannot control the phone does not apply here). Pass the user's request as a short Roman Hindi command, for example: 'torch on karo', 'torch off karo', 'volume badhao', 'volume kam karo', 'volume 50', 'youtube kholo', 'whatsapp kholo', 'arijit singh ke gaane youtube par chalao', 'gaana pause karo', 'next gaana', 'pichla gaana', 'rahul ko call karo', 'rahul ko whatsapp bhejo: kal milte hain', 'wifi on karo', 'battery kitni hai', 'back jao', 'home jao', 'scroll neeche'. Say you did something only if the function result confirms it, and report the result honestly (for example when the user still has to tap or press a button). If the result starts with CONFIRMATION REQUIRED, ask the user in one short sentence and call the function again with confirmed=true only after a clear yes. Never place calls, send messages or do anything that sends, pays or deletes without that confirmation. If the user asks what you or the app can do, answer from ABOUT YOURSELF. Only if the user says your name (Yesmin) together with a command: when told to stop, close or switch off, say one short line like okay I am switching off and call stop_assistant; when told to be quiet or pause for some time, say one short okay and call pause_assistant. Never do this without your name being said."
+            " This is a live voice call: reply in short spoken sentences, no markdown, no lists. You can see the user's phone screen: call read_screen whenever they ask what is on the screen, ask you to read, explain or help with something shown, or say this or here; call recent_activity when they ask what they just did. Describe what you find in simple spoken words and never read out passwords or OTPs. In this live call you CAN control the phone, but only through the phone_command function (the earlier rule that you cannot control the phone does not apply here). Pass the user's request as a short Roman Hindi command, for example: 'torch on karo', 'torch off karo', 'volume badhao', 'volume kam karo', 'volume 50', 'youtube kholo', 'whatsapp kholo', 'arijit singh ke gaane youtube par chalao', 'gaana pause karo', 'next gaana', 'pichla gaana', 'rahul ko call karo', 'rahul ko whatsapp bhejo: kal milte hain', 'wifi on karo', 'battery kitni hai', 'back jao', 'home jao', 'scroll neeche'. Say you did something only if the function result confirms it, and report the result honestly (for example when the user still has to tap or press a button). If the result starts with CONFIRMATION REQUIRED, ask the user in one short sentence and call the function again with confirmed=true only after a clear yes. Never place calls, send messages or do anything that sends, pays or deletes without that confirmation. If the user asks what you or the app can do, answer from ABOUT YOURSELF. Recognize your assistant names as Jasmine, Jasmin, and Yesmin. If the user asks to open Termux, call phone_command with command 'termux kholo'. If the user asks to run a shell command in Termux, state the exact command and ask for a clear yes first; only after the user says yes, call phone_command with command 'termux:<exact shell command>' and confirmed=true. Never infer a shell command from a vague request. The bridge cannot verify command output, so report that honestly. Only if the user says your name (Jasmine, Jasmin, or Yesmin) together with a command: when told to stop, close or switch off, say one short line like okay I am switching off and call stop_assistant; when told to be quiet or pause for some time, say one short okay and call pause_assistant. Never do this without your name being said."
         voiceState = VoiceState.Connecting
         viewModelScope.launch {
             val all = gemini.liveModels(key).filter { !it.contains("translate", true) }
