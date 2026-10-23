@@ -312,6 +312,7 @@ class LiveVoice(
         }.also { it.isDaemon = true }.start()
     }
 
+    @Volatile private var reconnects = 0
     @Volatile var quiet = false
     private val held = java.util.concurrent.CopyOnWriteArrayList<ByteArray>()
 
