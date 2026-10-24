@@ -98,7 +98,8 @@ object CommandRouter {
         "वॉल्यूम" to "volume", "आवाज" to "volume", "बढाओ" to "badhao", "बढ\u095Dाओ" to "badhao", "घटाओ" to "ghatao", "कम" to "kam",
         "म्यूट" to "mute", "कॉल" to "call", "मैसेज" to "message", "मैसेजेस" to "messages", "पढो" to "padho", "पढ\u095Dो" to "padho",
         "सुनो" to "suno", "ब्लूटूथ" to "bluetooth", "वाईफाई" to "wifi",
-        "यस्मिन" to "yesmin", "यसमिन" to "yesmin", "येस्मिन" to "yesmin", "यस्मीन" to "yesmin"
+        "यस्मिन" to "yesmin",
+        "थर्मक्स" to "termux", "थर्मॉक्स" to "termux", "थर्मोक्स" to "termux", "टर्मक्स" to "termux", "टर्मुक्स" to "termux", "थरमक्स" to "termux", "टरमक्स" to "termux", "यसमिन" to "yesmin", "येस्मिन" to "yesmin", "यस्मीन" to "yesmin"
     )
 
     /** Splits text into words; Devanagari (Hindi script) words are mapped to the same Roman keywords. */

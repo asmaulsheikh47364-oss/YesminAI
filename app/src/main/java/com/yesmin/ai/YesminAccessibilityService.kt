@@ -130,11 +130,27 @@ class YesminAccessibilityService : AccessibilityService() {
         )
     }
 
+    private fun findEditable(n: AccessibilityNodeInfo?): AccessibilityNodeInfo? {
+        if (n == null) return null
+        if (n.isEditable && n.isVisibleToUser) return n
+        for (i in 0 until n.childCount) {
+            val r = findEditable(n.getChild(i))
+            if (r != null) return r
+        }
+        return null
+    }
+
     private fun type(text: String): Boolean {
-        val f = rootInActiveWindow?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) ?: return false
+        val root = rootInActiveWindow ?: return false
+        val f = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) ?: findEditable(root) ?: return false
         if (f.isPassword) return false
+        f.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
+        f.performAction(AccessibilityNodeInfo.ACTION_CLICK)
         val args = Bundle()
         args.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text)
-        return f.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
+        if (f.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)) return true
+        val cm = getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+        cm.setPrimaryClip(android.content.ClipData.newPlainText("yesmin", text))
+        return f.performAction(AccessibilityNodeInfo.ACTION_PASTE)
     }
 }

@@ -118,6 +118,7 @@ fun YesminRoot() {
             }
             EdgeGlow(vm)
         }
+        if (vm.onboardingDone && (vm.disclosure || dismissed) && !(vm.lockEnabled && vm.locked)) PermissionSetup()
         if (vm.onboardingDone && !vm.disclosure && !dismissed && !(vm.lockEnabled && vm.locked)) {
             AlertDialog(
                 onDismissRequest = {},

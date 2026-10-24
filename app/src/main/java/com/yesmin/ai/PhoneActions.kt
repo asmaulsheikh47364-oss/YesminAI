@@ -23,7 +23,7 @@ object AppLauncher {
 
     private val alias = mapOf(
         "maps" to "google maps", "map" to "google maps", "insta" to "instagram", "yt" to "youtube",
-        "playstore" to "play store", "setting" to "settings"
+        "playstore" to "play store", "setting" to "settings", "thermux" to "termux", "termax" to "termux", "thermox" to "termux"
     )
 
     fun open(ctx: Context, name: String): R {

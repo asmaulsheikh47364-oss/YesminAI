@@ -89,6 +89,25 @@ fun SettingsScreen(vm: AppViewModel, nav: NavHostController) {
     ) {
         Text("Settings", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
 
+        Section("Termux (bolkar code likhwana)") {
+            val tInstalled = refresh >= 0 && TermuxBridge.installed(ctx)
+            val tPerm = refresh >= 0 && TermuxBridge.permitted(ctx)
+            var tStatus by remember { mutableStateOf("") }
+            val tLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { refresh++ }
+            Text("Termux: " + (if (tInstalled) "mila" else "nahi mila") + " · permission: " + (if (tPerm) "mili" else "nahi mili"))
+            Text(vm.agentStatus, style = MaterialTheme.typography.bodySmall)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = { tLauncher.launch(TermuxBridge.PERM) }) { Text("Permission do") }
+                OutlinedButton(onClick = { vm.testTermux { tStatus = it } }) { Text("Test karo") }
+            }
+            if (tStatus.isNotBlank()) Text(tStatus, style = MaterialTheme.typography.bodySmall)
+            Text(
+                "Ek baar Termux mein yeh command chalani hai: mkdir -p ~/.termux && echo allow-external-apps=true >> ~/.termux/termux.properties && termux-reload-settings. " +
+                    "Uske baad bolo: Yesmin, mujhe aisa kuch banana hai — wo Termux mein khud kaam karegi.",
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+
         Section("Yesmin") {
             OutlinedButton(onClick = { nav.navigate("profiles") { launchSingleTop = true } }, modifier = Modifier.fillMaxWidth()) { Text("🎭 AI Personalities") }
             OutlinedButton(onClick = { nav.navigate("device") { launchSingleTop = true } }, modifier = Modifier.fillMaxWidth()) { Text("📊 Device Info") }
