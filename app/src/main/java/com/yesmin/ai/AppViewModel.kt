@@ -556,6 +556,10 @@ fun runTermuxCommand(command: String) {
     fun liveCommand(text: String, confirmed: Boolean): String {
 
         val raw = text.trim()
+        val rawLower = raw.lowercase()
+        if (rawLower.startsWith("termux clear") || rawLower.startsWith("termux screen") || rawLower.startsWith("termux saaf")) {
+            return if (TermuxBridge.openTerminal(ctx)) "Opened a fresh Termux terminal, so the Termux screen is now clear." else "Could not open the Termux terminal. Check the Termux permission and allow-external-apps."
+        }
         if (raw.startsWith("@task")) return startAgent(raw.removePrefix("@task"))
         if (raw.startsWith("@status")) return agentStatus
         if (raw.startsWith("termux:", ignoreCase = true)) {
@@ -610,18 +614,16 @@ fun runTermuxCommand(command: String) {
                     if (v == null) "That calculation could not be understood." else cmd.expr.trim() + " = " + Calculator.format(v)
                 }
                 is Command.Call -> {
-                    if (!confirmed) {
-                        "CONFIRMATION REQUIRED: the user wants to call '" + cmd.target + "'. Ask one short question to confirm. Only after a clear yes, call phone_command again with the same command and confirmed=true."
-                    } else {
-                        when (val w = resolveWho(cmd.target)) {
-                            is Who.Ask -> w.text
-                            is Who.Ok -> {
-                                if (PhoneControl.dial(ctx, w.number)) {
-                                    logAction("Dial: " + w.name)
-                                    "The dialer is open with " + w.name + ". The user has to press the green call button."
-                                } else {
-                                    "The dialer could not be opened."
-                                }
+                    when (val w = resolveWho(cmd.target)) {
+                        is Who.Ask -> w.text
+                        is Who.Ok -> {
+                            if (!confirmed) {
+                                "CONFIRMATION REQUIRED (ask only once): call " + w.name + ". If the user says yes, call phone_command again with the same command and confirmed=true, and do not ask again."
+                            } else if (PhoneControl.dial(ctx, w.number)) {
+                                logAction("Dial: " + w.name)
+                                "The dialer is open with " + w.name + ". The user has to press the green call button."
+                            } else {
+                                "The dialer could not be opened."
                             }
                         }
                     }
@@ -629,19 +631,30 @@ fun runTermuxCommand(command: String) {
                 is Command.Message -> {
                     if (cmd.body.isBlank()) {
                         "Ask the user what the message should say."
-                    } else if (!confirmed) {
-                        "CONFIRMATION REQUIRED: send a " + cmd.channel + " message to '" + cmd.name + "' saying '" + cmd.body + "'. Read it back in one short sentence and ask. Only after a clear yes, call phone_command again with the same command and confirmed=true. The app only opens the draft; the user presses Send."
                     } else {
                         when (val w = resolveWho(cmd.name)) {
                             is Who.Ask -> w.text
                             is Who.Ok -> {
-                                val wa = cmd.channel == "whatsapp"
-                                val ok = if (wa) PhoneControl.whatsapp(ctx, w.number, cmd.body) else PhoneControl.sms(ctx, w.number, cmd.body)
-                                if (ok) {
-                                    logAction((if (wa) "WhatsApp" else "SMS") + " draft: " + w.name)
-                                    "The message to " + w.name + " is written in the app. The user has to press Send."
+                                if (!confirmed) {
+                                    "CONFIRMATION REQUIRED (ask only once): send a " + cmd.channel + " message to " + w.name + " saying '" + cmd.body + "'. Read it back in one short sentence. If the user says yes, call phone_command again with the same command and confirmed=true, and do not ask again."
                                 } else {
-                                    "The messaging app could not be opened."
+                                    val wa = cmd.channel == "whatsapp"
+                                    val ok = if (wa) PhoneControl.whatsapp(ctx, w.number, cmd.body) else PhoneControl.sms(ctx, w.number, cmd.body)
+                                    if (!ok) {
+                                        "The messaging app could not be opened."
+                                    } else {
+                                        logAction((if (wa) "WhatsApp" else "SMS") + " draft: " + w.name)
+                                        if (YesminAccessibilityService.isRunning()) {
+                                            viewModelScope.launch {
+                                                kotlinx.coroutines.delay(3000L)
+                                                val sent = tapSend(A11yAction.Tap("Send"))
+                                                live?.tellModel("[SEND RESULT] The Send button " + (if (sent) "was pressed." else "could not be pressed, so the user must press Send.") + " Tell the user briefly.")
+                                            }
+                                            "The message for " + w.name + " is open. The app presses Send by itself in about 3 seconds and will tell you the result. Say one short line that it is being sent."
+                                        } else {
+                                            "The message for " + w.name + " is written. Accessibility is off, so the user must press Send."
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -771,7 +784,7 @@ fun runTermuxCommand(command: String) {
         val p = activeProfile()
         val mem = if (memoryEnabled && !tempMode) memories.filter { it.category != "snippet" }.take(30).map { it.text } else emptyList()
         val system = Personas.chatSystem(persona, language, mem, p.name, p.tone) +
-            " This is a live voice call: reply in short spoken sentences, no markdown, no lists. You can see the user's phone screen: call read_screen whenever they ask what is on the screen, ask you to read, explain or help with something shown, or say this or here; call recent_activity when they ask what they just did. Describe what you find in simple spoken words and never read out passwords or OTPs. In this live call you CAN control the phone, but only through the phone_command function (the earlier rule that you cannot control the phone does not apply here). Pass the user's request as a short Roman Hindi command, for example: 'torch on karo', 'torch off karo', 'volume badhao', 'volume kam karo', 'volume 50', 'youtube kholo', 'whatsapp kholo', 'arijit singh ke gaane youtube par chalao', 'gaana pause karo', 'next gaana', 'pichla gaana', 'rahul ko call karo', 'rahul ko whatsapp bhejo: kal milte hain', 'wifi on karo', 'battery kitni hai', 'back jao', 'home jao', 'scroll neeche'. Say you did something only if the function result confirms it, and report the result honestly (for example when the user still has to tap or press a button). If the result starts with CONFIRMATION REQUIRED, ask the user in one short sentence and call the function again with confirmed=true only after a clear yes. Never place calls, send messages or do anything that sends, pays or deletes without that confirmation. If the user asks what you or the app can do, answer from ABOUT YOURSELF. TERMUX AND CODING: when the user wants something built or changed, or wants commands run (an app, an APK, a script, git, project edits), turn his short request into a complete goal yourself, say it back in one short sentence, and start it with phone_command using command '@task <full goal with every detail you can infer>'. It runs in the background while you keep chatting; ask at most one short question first, only if the goal is truly unclear. Use '@status' to tell progress. When a message starting with [TASK RESULT] arrives, tell the user the real outcome briefly. Never say you cannot use Termux or cannot make an APK: you run commands in Termux and GitHub builds the APK. MESSAGES: when the user asks you to send a message without giving the exact words (for example a nice shayari for Imran), write the message yourself in his style, read it out for approval, and only then use it with the 'whatsapp bhejo' command; after the draft opens and he says yes, call phone_command with 'tap send' and confirmed=true. If a person's name or an app name sounds like Termux (thermux, thermox) it is the app Termux. Recognize your assistant names as Jasmine, Jasmin, and Yesmin. If the user asks to open Termux, call phone_command with command 'termux kholo'. If the user asks to run a shell command in Termux, state the exact command and ask for a clear yes first; only after the user says yes, call phone_command with command 'termux:<exact shell command>' and confirmed=true. Never infer a shell command from a vague request. The bridge cannot verify command output, so report that honestly. Only if the user says your name (Jasmine, Jasmin, or Yesmin) together with a command: when told to stop, close or switch off, say one short line like okay I am switching off and call stop_assistant; when told to be quiet or pause for some time, say one short okay and call pause_assistant. Never do this without your name being said."
+            " This is a live voice call: reply in short spoken sentences, no markdown, no lists. You can see the user's phone screen: call read_screen whenever they ask what is on the screen, ask you to read, explain or help with something shown, or say this or here; call recent_activity when they ask what they just did. Describe what you find in simple spoken words and never read out passwords or OTPs. In this live call you CAN control the phone, but only through the phone_command function (the earlier rule that you cannot control the phone does not apply here). Pass the user's request as a short Roman Hindi command, for example: 'torch on karo', 'torch off karo', 'volume badhao', 'volume kam karo', 'volume 50', 'youtube kholo', 'whatsapp kholo', 'arijit singh ke gaane youtube par chalao', 'gaana pause karo', 'next gaana', 'pichla gaana', 'rahul ko call karo', 'rahul ko whatsapp bhejo: kal milte hain', 'wifi on karo', 'battery kitni hai', 'back jao', 'home jao', 'scroll neeche'. Say you did something only if the function result confirms it, and report the result honestly (for example when the user still has to tap or press a button). If the result starts with CONFIRMATION REQUIRED, ask the user in one short sentence and call the function again with confirmed=true only after a clear yes. Never place calls, send messages or do anything that sends, pays or deletes without that confirmation. If the user asks what you or the app can do, answer from ABOUT YOURSELF. TERMUX AND CODING: when the user wants something built or changed, or wants commands run (an app, an APK, a script, git, project edits), turn his short request into a complete goal yourself, say it back in one short sentence, and start it with phone_command using command '@task <full goal with every detail you can infer>'. It runs in the background while you keep chatting; ask at most one short question first, only if the goal is truly unclear. Use '@status' to tell progress. When a message starting with [TASK RESULT] arrives, tell the user the real outcome briefly. Never say you cannot use Termux or cannot make an APK: you run commands in Termux and GitHub builds the APK. MESSAGES: when the user asks you to send a message without giving the exact words (for example a nice shayari for Imran), write the message yourself in his style, read it out for approval, and only then use it with the 'whatsapp bhejo' command; after the draft opens and he says yes, call phone_command with 'tap send' and confirmed=true. If a person's name or an app name sounds like Termux (thermux, thermox) it is the app Termux. CONFIRMATIONS: ask for confirmation at most once per action; after the user says yes call phone_command with confirmed=true and do not ask again; if a result says a contact was not found, tell the user and stop. If the user asks to clear the Termux screen, call phone_command with 'termux clear'. To play a song from YouTube results: call read_screen, pick the best matching title, then phone_command 'tap <a few words of that title>'; to play the first result use 'tap pehla result'; to see more results use 'scroll neeche'. Recognize your assistant names as Jasmine, Jasmin, and Yesmin. If the user asks to open Termux, call phone_command with command 'termux kholo'. If the user asks to run a shell command in Termux, state the exact command and ask for a clear yes first; only after the user says yes, call phone_command with command 'termux:<exact shell command>' and confirmed=true. Never infer a shell command from a vague request. The bridge cannot verify command output, so report that honestly. Only if the user says your name (Jasmine, Jasmin, or Yesmin) together with a command: when told to stop, close or switch off, say one short line like okay I am switching off and call stop_assistant; when told to be quiet or pause for some time, say one short okay and call pause_assistant. Never do this without your name being said."
         voiceState = VoiceState.Connecting
         viewModelScope.launch {
             val all = gemini.liveModels(key).filter { !it.contains("translate", true) }

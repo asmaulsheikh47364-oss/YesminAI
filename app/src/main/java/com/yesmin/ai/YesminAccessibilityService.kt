@@ -105,6 +105,7 @@ class YesminAccessibilityService : AccessibilityService() {
     }
 
     private fun tap(label: String): Boolean {
+        if (label.trim().lowercase() in setOf("pehla result", "first result", "pehla video", "first video", "pehla gaana", "pehla")) return tapFirstResult()
         val root = rootInActiveWindow ?: return false
         for (n in root.findAccessibilityNodeInfosByText(label)) {
             var x: AccessibilityNodeInfo? = n
@@ -123,7 +124,54 @@ class YesminAccessibilityService : AccessibilityService() {
         return null
     }
 
+    private fun swipe(up: Boolean): Boolean {
+        val dm = resources.displayMetrics
+        val x = dm.widthPixels / 2f
+        val y1 = dm.heightPixels * (if (up) 0.72f else 0.28f)
+        val y2 = dm.heightPixels * (if (up) 0.28f else 0.72f)
+        val path = android.graphics.Path()
+        path.moveTo(x, y1)
+        path.lineTo(x, y2)
+        val g = android.accessibilityservice.GestureDescription.Builder()
+            .addStroke(android.accessibilityservice.GestureDescription.StrokeDescription(path, 0L, 350L))
+            .build()
+        return dispatchGesture(g, null, null)
+    }
+
+    private fun tapAt(x: Float, y: Float): Boolean {
+        val path = android.graphics.Path()
+        path.moveTo(x, y)
+        val g = android.accessibilityservice.GestureDescription.Builder()
+            .addStroke(android.accessibilityservice.GestureDescription.StrokeDescription(path, 0L, 80L))
+            .build()
+        return dispatchGesture(g, null, null)
+    }
+
+    private fun firstResultNode(n: AccessibilityNodeInfo?, minTop: Int): AccessibilityNodeInfo? {
+        if (n == null) return null
+        if (n.isClickable && n.isVisibleToUser) {
+            val r = android.graphics.Rect()
+            n.getBoundsInScreen(r)
+            val txt = (n.contentDescription ?: n.text)?.toString() ?: ""
+            if (r.top >= minTop && txt.length > 15 && r.height() > 150) return n
+        }
+        for (i in 0 until n.childCount) {
+            val x = firstResultNode(n.getChild(i), minTop)
+            if (x != null) return x
+        }
+        return null
+    }
+
+    private fun tapFirstResult(): Boolean {
+        val root = rootInActiveWindow ?: return false
+        val dm = resources.displayMetrics
+        val n = firstResultNode(root, (dm.heightPixels * 0.15f).toInt())
+        if (n != null && n.performAction(AccessibilityNodeInfo.ACTION_CLICK)) return true
+        return tapAt(dm.widthPixels / 2f, dm.heightPixels * 0.40f)
+    }
+
     private fun scroll(forward: Boolean): Boolean {
+        if (swipe(forward)) return true
         val node = findScrollable(rootInActiveWindow) ?: return false
         return node.performAction(
             if (forward) AccessibilityNodeInfo.ACTION_SCROLL_FORWARD else AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD

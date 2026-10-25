@@ -3,6 +3,7 @@
     android:accessibilityEventTypes="typeWindowStateChanged|typeViewClicked"
     android:accessibilityFeedbackType="feedbackGeneric"
     android:canRetrieveWindowContent="true"
+    android:canPerformGestures="true"
     android:accessibilityFlags="flagDefault"
     android:notificationTimeout="200"
     android:description="@string/a11y_desc" />

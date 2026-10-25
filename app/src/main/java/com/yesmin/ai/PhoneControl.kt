@@ -124,27 +124,84 @@ object PhoneControl {
     }
 }
 
+/** Turns a name written in Devanagari or Roman letters into the same sound skeleton (consonants only), so Aman and the Hindi spelling match. */
+object NameKey {
+    private val dev = mapOf(
+        'क' to "k", 'ख' to "k", 'ग' to "g", 'घ' to "g", 'ङ' to "n", 'च' to "c", 'छ' to "c", 'ज' to "j", 'झ' to "j", 'ञ' to "n",
+        'ट' to "t", 'ठ' to "t", 'ड' to "d", 'ढ' to "d", 'ण' to "n", 'त' to "t", 'थ' to "t", 'द' to "d", 'ध' to "d", 'न' to "n",
+        'प' to "p", 'फ' to "f", 'ब' to "b", 'भ' to "b", 'म' to "m", 'र' to "r", 'ल' to "l", 'व' to "v", 'श' to "s", 'ष' to "s", 'स' to "s"
+    )
+
+    fun key(s: String): String {
+        val t = s.lowercase()
+        val sb = StringBuilder()
+        var i = 0
+        while (i < t.length) {
+            val c = t[i]
+            val d = dev[c]
+            if (d != null) {
+                sb.append(d)
+                i++
+                continue
+            }
+            if (c in 'a'..'z') {
+                val nx = if (i + 1 < t.length) t[i + 1] else ' '
+                val vowelish = c == 'a' || c == 'e' || c == 'i' || c == 'o' || c == 'u' || c == 'y' || c == 'h'
+                if (!vowelish && nx == 'h') {
+                    sb.append(if (c == 'p') 'f' else c)
+                    i += 2
+                    continue
+                }
+                if (!vowelish) {
+                    when (c) {
+                        'w' -> sb.append('v')
+                        'z' -> sb.append('j')
+                        'q' -> sb.append('k')
+                        'x' -> sb.append("ks")
+                        else -> sb.append(c)
+                    }
+                }
+            }
+            i++
+        }
+        return sb.toString()
+    }
+}
+
 object Contacts {
     fun hasPermission(ctx: Context): Boolean =
         ContextCompat.checkSelfPermission(ctx, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED
 
-    /** null = no permission. Otherwise a list of (display name, number). */
+    /** null = no permission. Otherwise a list of (display name, number). Matches exact, partial, then by sound (Hindi or English spelling). */
     fun find(ctx: Context, query: String): List<Pair<String, String>>? {
         if (!hasPermission(ctx)) return null
-        val out = mutableListOf<Pair<String, String>>()
+        val all = mutableListOf<Pair<String, String>>()
         try {
             ctx.contentResolver.query(
                 ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
                 arrayOf(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME, ContactsContract.CommonDataKinds.Phone.NUMBER),
-                ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME + " LIKE ?",
-                arrayOf("%" + query.trim() + "%"),
-                null
+                null, null, null
             )?.use { c ->
-                while (c.moveToNext() && out.size < 30) out.add(c.getString(0) to c.getString(1))
+                while (c.moveToNext() && all.size < 4000) {
+                    val n = c.getString(0)
+                    val num = c.getString(1)
+                    if (n != null && num != null) all.add(n to num)
+                }
             }
         } catch (e: Exception) {
         }
-        return out
+        val q = query.trim()
+        val ql = q.lowercase()
+        val t1 = all.filter { it.first.lowercase() == ql }
+        if (t1.isNotEmpty()) return t1.take(30)
+        val t2 = all.filter { it.first.lowercase().contains(ql) }
+        if (t2.isNotEmpty()) return t2.take(30)
+        val qk = NameKey.key(q)
+        if (qk.length < 2) return emptyList()
+        val t3 = all.filter { c -> NameKey.key(c.first) == qk || c.first.split(" ", ".", "-").any { NameKey.key(it) == qk } }
+        if (t3.isNotEmpty()) return t3.take(30)
+        if (qk.length < 3) return emptyList()
+        return all.filter { NameKey.key(it.first).contains(qk) }.take(30)
     }
 
     fun distinctNames(l: List<Pair<String, String>>): List<String> = l.map { it.first }.distinct()

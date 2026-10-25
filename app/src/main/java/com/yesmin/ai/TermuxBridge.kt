@@ -94,6 +94,21 @@ object TermuxBridge {
         waiting[id]?.complete(res)
     }
 
+    /** Opens a fresh visible Termux terminal (this really clears the Termux screen). */
+    fun openTerminal(ctx: Context): Boolean = try {
+        val i = Intent("com.termux.RUN_COMMAND")
+            .setClassName("com.termux", "com.termux.app.RunCommandService")
+            .putExtra("com.termux.RUN_COMMAND_PATH", BASH)
+            .putExtra("com.termux.RUN_COMMAND_ARGUMENTS", arrayOf("-c", "clear; cd ~/YesminAI 2>/dev/null; exec bash -l"))
+            .putExtra("com.termux.RUN_COMMAND_WORKDIR", HOME)
+            .putExtra("com.termux.RUN_COMMAND_BACKGROUND", false)
+            .putExtra("com.termux.RUN_COMMAND_SESSION_ACTION", "0")
+        ContextCompat.startForegroundService(ctx.applicationContext, i)
+        true
+    } catch (e: Exception) {
+        false
+    }
+
     suspend fun run(ctx: Context, command: String, workdir: String = HOME, timeoutMs: Long = 180000L): Res {
         val app = ctx.applicationContext
         val id = nextId.incrementAndGet()
