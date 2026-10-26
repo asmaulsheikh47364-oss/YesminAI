@@ -124,6 +124,86 @@ class YesminAccessibilityService : AccessibilityService() {
         return null
     }
 
+    private fun walkAll(n: AccessibilityNodeInfo?, out: MutableList<AccessibilityNodeInfo>, limit: Int) {
+        if (n == null || out.size >= limit) return
+        if (n.isVisibleToUser) out.add(n)
+        for (i in 0 until n.childCount) walkAll(n.getChild(i), out, limit)
+    }
+
+    private fun labelOf(n: AccessibilityNodeInfo): String =
+        ((n.text ?: n.contentDescription)?.toString() ?: "").filter { it >= ' ' }.trim().take(80)
+
+    private fun deepLabel(n: AccessibilityNodeInfo, depth: Int = 0): String {
+        val own = labelOf(n)
+        if (own.isNotEmpty() || depth >= 3) return own
+        for (i in 0 until n.childCount) {
+            val c = n.getChild(i) ?: continue
+            val l = deepLabel(c, depth + 1)
+            if (l.isNotEmpty()) return l
+        }
+        return ""
+    }
+
+    private fun isInteractive(n: AccessibilityNodeInfo): Boolean {
+        if (n.isPassword) return false
+        if (n.isEditable) return true
+        return n.isClickable && deepLabel(n).isNotEmpty()
+    }
+
+    /** The visible screen as a numbered list: [n] button or input, plus plain text lines. Used by the screen-control agent. */
+    fun screenForAgent(): String {
+        val root = rootInActiveWindow ?: return "Screen padh nahi paaya"
+        val all = ArrayList<AccessibilityNodeInfo>()
+        walkAll(root, all, 400)
+        val nl = System.lineSeparator()
+        val sb = StringBuilder("APP: " + root.packageName + nl)
+        var idx = 0
+        for (n in all) {
+            if (sb.length > 3500) break
+            if (n.isPassword) continue
+            if (isInteractive(n)) {
+                sb.append("[").append(idx).append("] ").append(if (n.isEditable) "input" else "button").append(": ").append(deepLabel(n)).append(nl)
+                idx++
+            } else if (!n.isClickable) {
+                val own = labelOf(n)
+                if (own.isNotEmpty()) sb.append("   text: ").append(own).append(nl)
+            }
+        }
+        return sb.toString()
+    }
+
+    private fun nodeAt(index: Int): AccessibilityNodeInfo? {
+        val root = rootInActiveWindow ?: return null
+        val all = ArrayList<AccessibilityNodeInfo>()
+        walkAll(root, all, 400)
+        var idx = 0
+        for (n in all) {
+            if (isInteractive(n)) {
+                if (idx == index) return n
+                idx++
+            }
+        }
+        return null
+    }
+
+    fun labelAt(index: Int): String? {
+        val n = nodeAt(index) ?: return null
+        return deepLabel(n)
+    }
+
+    fun tapIndex(index: Int): Boolean {
+        val n = nodeAt(index) ?: return false
+        if (n.isEditable) {
+            n.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
+            n.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+            return true
+        }
+        if (n.performAction(AccessibilityNodeInfo.ACTION_CLICK)) return true
+        val r = android.graphics.Rect()
+        n.getBoundsInScreen(r)
+        return tapAt(r.centerX().toFloat(), r.centerY().toFloat())
+    }
+
     private fun swipe(up: Boolean): Boolean {
         val dm = resources.displayMetrics
         val x = dm.widthPixels / 2f

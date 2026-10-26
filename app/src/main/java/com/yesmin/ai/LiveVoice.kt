@@ -121,7 +121,7 @@ class LiveVoice(
             .put("confirmed", JSONObject().put("type", "BOOLEAN").put("description", "true only after the user clearly said yes to a CONFIRMATION REQUIRED question, otherwise false."))
         return JSONObject()
             .put("name", "phone_command")
-            .put("description", "Special commands: '@task <goal>' starts a background coding job in Termux that works step by step, checks real output and retries by itself; '@status' tells its progress. Controls the phone and can launch Termux. For Termux shell execution, ask for explicit confirmation of the exact command first, then use command=termux:<exact shell command> and confirmed=true. For opening the Termux app UI use command=termux kholo. Never claim shell output was verified; the bridge currently reports only whether the request was sent. Calls, messages and other consequential actions require confirmation.")
+            .put("description", "Special commands: '@task <goal>' starts a background coding job in Termux that works step by step, checks real output and retries by itself; '@status' tells its progress; '@ui <goal>' controls any app on screen step by step. Controls the phone and can launch Termux. For Termux shell execution, ask for explicit confirmation of the exact command first, then use command=termux:<exact shell command> and confirmed=true. For opening the Termux app UI use command=termux kholo. Never claim shell output was verified; the bridge currently reports only whether the request was sent. Calls, messages and other consequential actions require confirmation.")
             .put("parameters", JSONObject().put("type", "OBJECT").put("properties", props).put("required", JSONArray().put("command")))
     }
 
