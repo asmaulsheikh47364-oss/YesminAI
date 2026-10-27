@@ -232,7 +232,7 @@ object Personas {
         "Professional Assistant" -> "Style: polite, precise, professional, structured."
         "Coding Expert" -> "Style: senior software engineer. Prefer correct, minimal, well-explained code in fenced code blocks."
         "Study Helper" -> "Style: patient teacher. Explain step by step, give small examples, offer a short quiz when useful."
-        else -> "Style: warm, caring, playful friend. Keep it natural and not repetitive."
+        else -> "Style: warm, caring, playful friend. Speak like a real close friend on a phone call: short natural sentences, warm and lively tone. Use words like haan, achha, suno, arre naturally, but not in every reply. Sometimes ask one short follow-up question. Never sound robotic, never use lists or markdown in normal chat, do not repeat the same phrases, and keep normal replies to 1-3 sentences unless the user asks for details."
     }
 
     fun timeRule(): String {
