@@ -6,7 +6,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
-/** Controls any app on screen step by step: reads the screen, picks one action, checks the result, and repeats until the goal is done. */
 class UiJob(
     private val ctx: Context,
     private val gemini: GeminiClient,
@@ -15,25 +14,41 @@ class UiJob(
     private val progress: (String) -> Unit
 ) {
     private val system = """
-You control an Android phone for the user through the Accessibility service, like a careful person using the phone. The user is not technical; he states a goal in plain words and you do the whole job.
-Each turn you get the screen as a list. Lines starting with [number] are things you can tap (button) or type into (input). Lines starting with text: are just labels.
-Work like a human: open the right app first, find the right place on screen, tap, type, scroll, go back, and check after every step what the screen shows now.
-Rules:
-1. Use open_app to open any installed app by its name. Never say an app is not allowed; just try to open it.
-2. To type, first tap the input, then use type. After typing a message, tap the send button yourself.
-3. If you cannot see what you need, use scroll_down or scroll_up, or back, or look for a search icon or box.
-4. Never enter passwords, OTP or card numbers. Never press anything that pays, buys, transfers money or deletes.
-5. If something fails, try a different way. If you are truly stuck after several different tries, finish with done and say honestly what is blocking.
-6. Never claim success unless the screen proves it.
+You control an Android phone through the Accessibility service. Finish the whole task yourself without asking the user at every small step.
+
+WHATSAPP MESSAGE RULES:
+If the goal is to send a WhatsApp message:
+1. Use open_app to open WhatsApp.
+2. Wait, then find and tap the search icon or search box.
+3. Type the person's name exactly as the user said.
+4. Choose the best matching chat or contact. Prefer an exact name match.
+5. If multiple people have the same name, stop and say which one is needed.
+6. Open the correct chat.
+7. Tap the message input box.
+8. Type the exact message.
+9. If the GOAL contains CONFIRMED_SEND_YES, find and tap the Send button, then finish with: Message sent to the person.
+10. If the GOAL does NOT contain CONFIRMED_SEND_YES, DO NOT press send. Finish with: Message ready. Send button is not pressed.
+
+GENERAL RULES:
+- Use open_app to open any installed app by its name.
+- To type, first tap the input field, then use type.
+- If you cannot see what you need, use scroll_down, scroll_up, back, or look for a search icon or box.
+- Never enter passwords, OTP, card numbers, or make payments.
+- Never press pay, buy, delete, uninstall, transfer, checkout, place order, or factory reset.
+- If something fails, try another way. If truly stuck, finish with done and explain honestly.
+- Never claim success unless the screen proves it.
+
 REPLY with exactly one JSON object and nothing else:
 {"thought":"short reason","action":"tap","index":3}
 {"thought":"short reason","action":"type","text":"hello"}
 {"thought":"short reason","action":"open_app","app":"whatsapp"}
 Other actions: scroll_down, scroll_up, back, home, wait.
-When the goal is finished or impossible: {"done_reason":"short","action":"done","summary":"1 to 3 short Hinglish sentences with the real result"}
-""".trimIndent()
+When finished or impossible:
+{"done_reason":"short","action":"done","summary":"1 to 3 short Hinglish sentences with the real result"}
+    """.trimIndent()
 
     private val danger = Regex("(?i)(^|[^a-z])(pay|buy|purchase|delete|uninstall|transfer|checkout|place order|factory reset)([^a-z]|$)")
+    private val sendWords = Regex("(?i)(send|bhej)")
 
     private fun parse(t: String): JSONObject? {
         val s = t.trim()
@@ -51,18 +66,19 @@ When the goal is finished or impossible: {"done_reason":"short","action":"done",
 
     suspend fun run(goal: String): String {
         val nl = System.lineSeparator()
+        val allowSend = goal.contains("CONFIRMED_SEND_YES", ignoreCase = true)
         val hist = ArrayList<Pair<String, String>>()
         var note = "Start. Nothing done yet."
         var fails = 0
         var lastSig = ""
         var same = 0
-        for (step in 1..25) {
+        for (step in 1..30) {
             val svc = YesminAccessibilityService.instance
                 ?: return "Accessibility service chalu nahi hai. Settings mein Yesmin AI ko ek baar OFF karke phir ON karo."
             val screen = onMain { svc.screenForAgent() }
             hist.add("user" to ("GOAL: " + goal + nl + "LAST RESULT: " + note + nl + "SCREEN NOW:" + nl + screen + nl + "Reply with one JSON action."))
             progress("Step " + step)
-            val send = if (hist.size > 5) hist.takeLast(5) else hist
+            val send = if (hist.size > 6) hist.takeLast(6) else hist
             val r = gemini.generate(key, model, system, send, 0.2f)
             if (!r.ok) {
                 hist.removeAt(hist.size - 1)
@@ -96,7 +112,9 @@ When the goal is finished or impossible: {"done_reason":"short","action":"done",
                     if (lab == null) {
                         note = "There is no element with that index on this screen."
                     } else if (danger.containsMatchIn(lab)) {
-                        return "'" + lab + "' dabana risky hai (paisa ya delete), isliye ruk gayi. Aap khud dabaiye."
+                        return "Risky button nahi daba sakti. Aap khud confirm karke dabaiye."
+                    } else if (sendWords.containsMatchIn(lab) && !allowSend) {
+                        return "Message ready, lekin aapne abhi confirm nahi kiya. Pehle haan boliye."
                     } else {
                         val ok = onMain { svc.tapIndex(i) }
                         note = if (ok) "Tapped [" + i + "] " + lab else "Tap failed on [" + i + "] " + lab
@@ -130,7 +148,7 @@ When the goal is finished or impossible: {"done_reason":"short","action":"done",
                         is AppLauncher.R.Failed -> "Could not open the app: " + r2.msg
                         else -> "No installed app is named " + name + "."
                     }
-                    delay(1500L)
+                    delay(1800L)
                 }
                 "wait" -> {
                     delay(1500L)
@@ -140,6 +158,6 @@ When the goal is finished or impossible: {"done_reason":"short","action":"done",
             }
             delay(1000L)
         }
-        return "25 step mein poora nahi ho paya. Jitna hua wo ho gaya; dobara bolo to aage badhaungi."
+        return "30 step mein poora nahi ho paya. Jitna hua wo ho gaya; dobara bolo to aage badhaungi."
     }
 }
