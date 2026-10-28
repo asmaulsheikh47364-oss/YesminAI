@@ -1,4 +1,5 @@
 package com.yesmin.ai
+import com.yesmin.ai.agent.TaskOrchestrator
 
 import android.app.Application
 import android.Manifest
@@ -222,7 +223,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         lastUserText = t
         if (saveHistory && !tempMode) db.addHistory(true, t)
         val cmd = CommandRouter.parse(t)
-        if (cmd !is Command.None) handleCommand(cmd, speak) else askGemini(speak)
+        if (cmd !is Command.None) handleCommand(cmd, speak) else if (listOf("github", "git ", "git push", "git pull", "repo", "termux").any { t.lowercase().contains(it) }) reply(TaskOrchestrator(ctx).runGoal(t), speak) else if (listOf("button do", "button add", "ui badal", "ui badlo", "design badal", "screen mein add", "copy button").any { t.lowercase().contains(it) }) startAgent(t) else askGemini(speak)
     }
 
     private fun handleCommand(cmd: Command, speak: Boolean) {
@@ -505,7 +506,7 @@ fun runTermuxCommand(command: String) {
             val r = gemini.generate(key, model, Personas.chatSystem(persona, language, mem, activeProfile().name, activeProfile().tone), hist, temperature)
             busy = false
             noteResult(r)
-            if (r.ok) { reply(r.text, speak); autoRemember() } else reply(r.text, false, true)
+            if (r.ok) { reply(r.text.replace(Regex("(?s)```.*?```"), "").trim(), speak); autoRemember() } else reply(r.text, false, true)
         }
     }
 

@@ -1,6 +1,8 @@
 @file:OptIn(ExperimentalMaterial3Api::class)
 
 package com.yesmin.ai
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import com.yesmin.ai.agent.TaskOrchestrator
 
 import android.Manifest
@@ -48,9 +50,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -100,6 +100,7 @@ fun CodeBlock(raw: String, onSave: ((String) -> Unit)?) {
 
 @Composable
 fun Bubble(m: ChatMsg, vm: AppViewModel) {
+    val clipboard = LocalClipboardManager.current
     Row(
         Modifier.fillMaxWidth(),
         horizontalArrangement = if (m.fromUser) Arrangement.End else Arrangement.Start
@@ -115,11 +116,15 @@ fun Bubble(m: ChatMsg, vm: AppViewModel) {
         ) {
             Column(Modifier.padding(12.dp)) {
                 if (m.fromUser) Text(m.text) else RichText(m.text, onSave = { vm.addMemory("snippet", it) })
-                if (!m.fromUser && !m.error) TextButton(onClick = { vm.speakText(m.text) }) { Text("🔊 Suno") }
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    TextButton(onClick = { clipboard.setText(AnnotatedString(m.text)) }) { Text("📋 Copy") }
+                    if (!m.fromUser && !m.error) TextButton(onClick = { vm.speakText(m.text) }) { Text("🔊 Suno") }
+                }
             }
         }
     }
 }
+
 
 // ---------- Home ----------
 
@@ -155,7 +160,7 @@ fun HomeScreen(vm: AppViewModel, nav: NavHostController) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        HomeHero(vm, title) { onMic() }; PermissionSetup(); AgentCard()
+        HomeHero(vm, title) { onMic() }; PermissionSetup()
 
         Text("Quick commands", style = MaterialTheme.typography.titleMedium, modifier = Modifier.fillMaxWidth())
         quick.chunked(2).forEach { row ->
