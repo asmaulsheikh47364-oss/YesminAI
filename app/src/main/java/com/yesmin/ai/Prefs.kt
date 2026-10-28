@@ -146,6 +146,10 @@ class Prefs(ctx: Context) {
     var userName: String
         get() = sp.getString("user_name", "") ?: ""
         set(v) { sp.edit().putString("user_name", v).apply() }
+    var isVipGolden: Boolean
+        get() = sp.getBoolean("is_vip_golden", false)
+        set(v) { sp.edit().putBoolean("is_vip_golden", v).apply() }
+
     var disclosure: Boolean
         get() = sp.getBoolean("disclosure", false)
         set(v) { sp.edit().putBoolean("disclosure", v).apply() }
