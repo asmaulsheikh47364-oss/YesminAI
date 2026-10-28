@@ -25,7 +25,7 @@ class MainActivity : AppCompatActivity() {
 
 @Composable
 fun YesminUi(vm: AppViewModel) {
-    MaterialTheme {
+    YesminTheme(dark = true) {
         val nav = rememberNavController()
         NavHost(nav, startDestination = "home") {
             composable("home") { HomeScreen(vm, nav) }
