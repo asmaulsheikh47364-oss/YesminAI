@@ -586,6 +586,9 @@ fun runTermuxCommand(command: String) {
         if (rawLower.startsWith("termux clear") || rawLower.startsWith("termux screen") || rawLower.startsWith("termux saaf")) {
             return if (TermuxBridge.openTerminal(ctx)) "Opened a fresh Termux terminal, so the Termux screen is now clear." else "Could not open the Termux terminal. Check the Termux permission and allow-external-apps."
         }
+        if (rawLower.contains("yaad rakho") || rawLower.contains("yaad rakhna") || rawLower.contains("github ka kaam") || rawLower.contains("git ka kaam")) {
+            return com.yesmin.ai.agent.TaskOrchestrator(ctx).runGoal(raw)
+        }
         if (raw.startsWith("@task")) return startAgent(raw.removePrefix("@task"))
         if (raw.startsWith("@status")) return agentStatus
         if (raw.startsWith("@ui")) return startUiAgent(raw.removePrefix("@ui"))
