@@ -71,7 +71,7 @@ class TaskOrchestrator(private val context: Context) {
     private fun githubTask(goal: String): String {
         val cmd = when {
             goal.contains("status") -> "cd ~/YesminAI && git status"
-            goal.contains("push") -> "cd ~/YesminAI && git add -A && git commit -m "Yesmin update" && git push"
+            goal.contains("push") -> "cd ~/YesminAI && git add -A && git commit -m \"Yesmin update\" && git push"
             goal.contains("pull") || goal.contains("update") -> "cd ~/YesminAI && git pull"
             else -> "cd ~/YesminAI && git status"
         }
