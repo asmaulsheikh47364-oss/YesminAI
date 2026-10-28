@@ -1,6 +1,7 @@
 @file:OptIn(ExperimentalMaterial3Api::class)
 
 package com.yesmin.ai
+import com.yesmin.ai.agent.TaskOrchestrator
 
 import android.Manifest
 import android.content.pm.PackageManager
@@ -268,6 +269,34 @@ fun ChatScreen(vm: AppViewModel) {
                 Text(if (vm.voiceState == VoiceState.Listening) "⏹" else "🎤")
             }
             Button(onClick = { vm.send(input, false); input = "" }, contentPadding = PaddingValues(14.dp)) { Text("➤") }
+        }
+    }
+}
+
+@Composable
+fun AgentCard() {
+    val ctx = LocalContext.current
+    var goal by remember { mutableStateOf("") }
+    var result by remember { mutableStateOf("") }
+    val agent = remember { TaskOrchestrator(ctx) }
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("🤖 Agent", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            OutlinedTextField(
+                value = goal,
+                onValueChange = { goal = it },
+                label = { Text("Kaam bolo (jaise: github status)") },
+                modifier = Modifier.fillMaxWidth()
+            )
+            Button(
+                onClick = { result = agent.runGoal(goal) },
+                enabled = goal.isNotBlank()
+            ) {
+                Text("Agent ko kaam do")
+            }
+            if (result.isNotBlank()) {
+                Text(result, style = MaterialTheme.typography.bodySmall)
+            }
         }
     }
 }
