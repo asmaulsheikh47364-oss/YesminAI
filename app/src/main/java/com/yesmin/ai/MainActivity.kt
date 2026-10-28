@@ -12,7 +12,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
+        val root = android.widget.LinearLayout(this); root.orientation = android.widget.LinearLayout.VERTICAL; val statusText = TextView(this); val actionButton = Button(this); root.addView(statusText); root.addView(actionButton); setContentView(root)
 
         taskOrchestrator = TaskOrchestrator(this)
 
