@@ -1,4 +1,5 @@
 package com.yesmin.ai
+import com.yesmin.ai.agent.CodingAgent
 
 import android.app.Application
 import android.Manifest
@@ -545,7 +546,7 @@ fun runTermuxCommand(command: String) {
         agentStatus = "Shuru: " + goal.take(80)
         agentJob = viewModelScope.launch(kotlinx.coroutines.Dispatchers.Default) {
             val result = try {
-                TermuxJob(ctx, gemini, key, model) { step -> agentStatus = step }.run(goal)
+                CodingAgent(ctx).runTask(goal)
             } catch (e: Exception) {
                 "Kaam beech mein ruk gaya: " + (e.message ?: "")
             }
