@@ -16,8 +16,6 @@ class MainActivity : AppCompatActivity() {
 
         taskOrchestrator = TaskOrchestrator(this)
 
-        val statusText = findViewById<TextView>(R.id.statusText)
-        val actionButton = findViewById<Button>(R.id.actionButton)
 
         statusText?.text = "Yesmin AI Initialized & Ready"
         LiveTaskMonitor.logStatus("MainActivity", "READY", "System initialized successfully.")
