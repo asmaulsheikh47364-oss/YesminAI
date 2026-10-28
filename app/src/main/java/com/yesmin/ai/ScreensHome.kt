@@ -161,7 +161,7 @@ fun HomeScreen(vm: AppViewModel, nav: NavHostController) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 row.forEach { (label, cmd) ->
                     FilledTonalButton(
-                        onClick = { vm.send(cmd, false); navTab(nav, "chat") },
+                        onClick = { vm.send(cmd, false); nav.navigate("chat") { launchSingleTop = true } },
                         modifier = Modifier.weight(1f)
                     ) { Text(label, maxLines = 1) }
                 }
