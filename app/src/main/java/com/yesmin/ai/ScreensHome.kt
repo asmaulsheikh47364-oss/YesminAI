@@ -155,7 +155,7 @@ fun HomeScreen(vm: AppViewModel, nav: NavHostController) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        HomeHero(vm, title) { onMic() }
+        HomeHero(vm, title) { onMic() }; PermissionSetup(); AgentCard()
 
         Text("Quick commands", style = MaterialTheme.typography.titleMedium, modifier = Modifier.fillMaxWidth())
         quick.chunked(2).forEach { row ->
