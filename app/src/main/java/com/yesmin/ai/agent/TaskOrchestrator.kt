@@ -21,7 +21,7 @@ class TaskOrchestrator(private val context: Context) {
         }
     }
 
-    fun runGoal(goal: String, planner: (suspend (goal: String, lastError: String?) -> String)? = null): String {
+    suspend fun runGoal(goal: String, planner: (suspend (goal: String, lastError: String?) -> String)? = null): String {
         val g = goal.lowercase().trim()
         return try {
             when {

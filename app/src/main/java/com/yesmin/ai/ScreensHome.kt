@@ -62,6 +62,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavHostController
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -395,6 +398,7 @@ fun AgentCard() {
     var goal by remember { mutableStateOf("") }
     var result by remember { mutableStateOf("") }
     val agent = remember { TaskOrchestrator(ctx) }
+    val scope = rememberCoroutineScope()
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("🤖 Agent", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -405,7 +409,7 @@ fun AgentCard() {
                 modifier = Modifier.fillMaxWidth()
             )
             Button(
-                onClick = { result = agent.runGoal(goal) },
+                onClick = { scope.launch { result = agent.runGoal(goal) } },
                 enabled = goal.isNotBlank()
             ) {
                 Text("Agent ko kaam do")
