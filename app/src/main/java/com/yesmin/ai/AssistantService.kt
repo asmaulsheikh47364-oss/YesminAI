@@ -37,6 +37,7 @@ class AssistantService : Service() {
         when (intent?.action) {
             ACTION_PAUSE -> vm.pauseSession()
             ACTION_RESUME -> vm.resumeSession()
+            ACTION_MUTE -> vm.toggleMicMute()
             ACTION_STOP -> {
                 vm.stopSession()
                 return START_NOT_STICKY
@@ -57,7 +58,7 @@ class AssistantService : Service() {
         }
         if (watcher == null) {
             watcher = scope.launch {
-                snapshotFlow { listOf<Any>(vm.sessionActive, vm.sessionPaused, vm.voiceState, AppVisibility.inForeground.value) }.collect {
+                snapshotFlow { listOf<Any>(vm.sessionActive, vm.sessionPaused, vm.micMuted, vm.voiceState, AppVisibility.inForeground.value) }.collect {
                     glowUpdate(vm)
                     if (!vm.sessionActive) {
                         stopSelf()
@@ -116,6 +117,7 @@ class AssistantService : Service() {
             .setContentIntent(open)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
         if (vm.sessionPaused) b.addAction(0, "Resume", action(ACTION_RESUME, 2)) else b.addAction(0, "Pause", action(ACTION_PAUSE, 3))
+        b.addAction(0, if (vm.micMuted) "Unmute" else "Mute", action(ACTION_MUTE, 5))
         b.addAction(0, "Stop", action(ACTION_STOP, 4))
         return b.build()
     }
@@ -132,6 +134,7 @@ class AssistantService : Service() {
         const val ACTION_PAUSE = "com.yesmin.ai.SESSION_PAUSE"
         const val ACTION_RESUME = "com.yesmin.ai.SESSION_RESUME"
         const val ACTION_STOP = "com.yesmin.ai.SESSION_STOP"
+        const val ACTION_MUTE = "com.yesmin.ai.SESSION_MUTE"
 
         fun start(ctx: Context) {
             ContextCompat.startForegroundService(ctx, Intent(ctx, AssistantService::class.java).setAction(ACTION_START))

@@ -3,6 +3,10 @@
 package com.yesmin.ai
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
+
 import com.yesmin.ai.agent.TaskOrchestrator
 
 import android.Manifest
@@ -58,6 +62,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavHostController
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+
 
 // ---------- shared widgets ----------
 
@@ -67,9 +84,37 @@ fun RichText(text: String, onSave: ((String) -> Unit)? = null) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         parts.forEachIndexed { i, p ->
             if (i % 2 == 0) {
-                if (p.isNotBlank()) Text(p.trim().replace("**", "").replace(Regex("(?m)^\\* "), "• "))
+                if (p.isNotBlank()) MarkdownText(p.trim())
             } else {
                 CodeBlock(p, onSave)
+            }
+        }
+    }
+}
+
+fun boldSpan(s: String): AnnotatedString = buildAnnotatedString {
+    val re = Regex("\\*\\*(.+?)\\*\\*")
+    var last = 0
+    for (m in re.findAll(s)) {
+        append(s.substring(last, m.range.first))
+        withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(m.groupValues[1]) }
+        last = m.range.last + 1
+    }
+    append(s.substring(last))
+}
+
+@Composable
+fun MarkdownText(text: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        text.lines().forEach { line ->
+            val t = line.trim()
+            when {
+                t.startsWith("### ") -> Text(boldSpan(t.removePrefix("### ")), fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                t.startsWith("## ") -> Text(boldSpan(t.removePrefix("## ")), fontWeight = FontWeight.Bold, fontSize = 19.sp)
+                t.startsWith("# ") -> Text(boldSpan(t.removePrefix("# ")), fontWeight = FontWeight.Bold, fontSize = 21.sp)
+                t.startsWith("> ") -> Text(boldSpan(t.removePrefix("> ")), color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(start = 8.dp))
+                t.startsWith("* ") || t.startsWith("- ") || t.startsWith("• ") -> Text("• " + boldSpan(t.drop(2)), modifier = Modifier.padding(start = 8.dp))
+                else -> Text(boldSpan(t))
             }
         }
     }
@@ -117,7 +162,7 @@ fun Bubble(m: ChatMsg, vm: AppViewModel) {
             Column(Modifier.padding(12.dp)) {
                 if (m.fromUser) Text(m.text) else RichText(m.text, onSave = { vm.addMemory("snippet", it) })
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    TextButton(onClick = { clipboard.setText(AnnotatedString(m.text)) }) { Text("📋 Copy") }
+                    TextButton(onClick = { clipboard.setText(AnnotatedString(m.text)) }) { Text("⧉ Copy") }
                     if (!m.fromUser && !m.error) TextButton(onClick = { vm.speakText(m.text) }) { Text("🔊 Suno") }
                 }
             }
@@ -189,6 +234,26 @@ fun HomeScreen(vm: AppViewModel, nav: NavHostController) {
 fun ChatScreen(vm: AppViewModel) {
     val ctx = LocalContext.current
     var input by remember { mutableStateOf("") }
+    var showAttach by remember { mutableStateOf(false) }
+    val fileLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            val name = ctx.contentResolver.query(uri, null, null, null, null)?.use { c ->
+                val i = c.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                if (i >= 0 && c.moveToFirst()) c.getString(i) else "file"
+            } ?: "file"
+            val text = ctx.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() } ?: ""
+            vm.sendFileToChat(name, text)
+        }
+    }
+    val imageLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) {
+            val b = ImageUtil.fromUri(ctx, uri)
+            if (b != null) vm.sendImageToChat(b, "Is photo mein kya hai?")
+        }
+    }
+    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bmp ->
+        if (bmp != null) vm.sendImageToChat(ImageUtil.toJpeg(bmp), "Is photo mein kya hai?")
+    }
     val listState = rememberLazyListState()
     LaunchedEffect(vm.messages.size) {
         if (vm.messages.isNotEmpty()) listState.animateScrollToItem(vm.messages.size - 1)
@@ -203,14 +268,37 @@ fun ChatScreen(vm: AppViewModel) {
             micLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
     }
-    Column(Modifier.fillMaxSize()) {
-        Row(
-            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            FilterChip(selected = vm.tempMode, onClick = { vm.tempMode = !vm.tempMode }, label = { Text("🕶 Temporary chat") })
-            Personas.names.forEach { n ->
-                FilterChip(selected = vm.persona == n, onClick = { vm.changePersona(n) }, label = { Text(n) })
+    val glow = rememberInfiniteTransition(label = "goldGlow")
+    val glowAlpha by glow.animateFloat(
+        initialValue = 0.25f,
+        targetValue = 0.85f,
+        animationSpec = infiniteRepeatable(tween(2600, easing = LinearEasing), RepeatMode.Reverse),
+        label = "glowAlpha"
+    )
+    Column(
+        Modifier.fillMaxSize().imePadding().navigationBarsPadding()
+    ) {
+        Box(Modifier.fillMaxWidth().height(96.dp)) {
+            Box(
+                Modifier.fillMaxSize().background(
+                    Brush.verticalGradient(listOf(Color(0x40FFD54F), Color(0x00000000)))
+                )
+            )
+            Box(
+                Modifier.align(Alignment.TopCenter).size(240.dp).graphicsLayer { alpha = glowAlpha }
+                    .background(
+                        Brush.radialGradient(listOf(Color(0x59FFC107), Color(0x00000000))),
+                        CircleShape
+                    )
+            )
+            Row(
+                Modifier.align(Alignment.BottomStart).fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                FilterChip(selected = vm.tempMode, onClick = { vm.tempMode = !vm.tempMode }, label = { Text("🕶 Temporary chat") })
+                Personas.names.forEach { n ->
+                    FilterChip(selected = vm.persona == n, onClick = { vm.changePersona(n) }, label = { Text(n) })
+                }
             }
         }
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -222,8 +310,13 @@ fun ChatScreen(vm: AppViewModel) {
         if (vm.messages.isEmpty()) {
             Column(Modifier.weight(1f).padding(24.dp), verticalArrangement = Arrangement.Center) {
                 Text("Namaste! 👋", style = MaterialTheme.typography.headlineSmall)
-                Text("Mic dabao ya type karo. Try karo:\n• \"YouTube kholo\"\n• \"Arijit Singh ke songs YouTube par\"\n• \"battery kitni hai\"\n• \"12 + 8 x 3\"\n• \"Kotlin mein calculator ka code likho\"")
-                if (!vm.hasKey) Text("\n⚠ AI jawab ke liye AI Brain tab mein Gemini key daalo. Local commands bina key ke chalte hain.")
+                Text("Mic dabao ya type karo. Try karo:")
+                Text("• YouTube kholo")
+                Text("• Arijit Singh ke songs YouTube par")
+                Text("• battery kitni hai")
+                Text("• 12 + 8 x 3")
+                Text("• Kotlin mein calculator ka code likho")
+                if (!vm.hasKey) Text("AI jawab ke liye AI Brain tab mein Gemini key daalo. Local commands bina key ke chalte hain.")
             }
         } else {
             LazyColumn(
@@ -252,7 +345,7 @@ fun ChatScreen(vm: AppViewModel) {
                 Column(Modifier.padding(12.dp)) {
                     Text("Jawab bhejna hai?", fontWeight = FontWeight.Bold)
                     Text(p.msg.sender + " (" + p.msg.app + ") ko jayega:")
-                    Text("\"" + p.text + "\"")
+                    Text('"' + p.text + '"')
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(onClick = { vm.confirmReply() }) { Text("Bhejo") }
                         TextButton(onClick = { vm.cancelReply() }) { Text("Cancel") }
@@ -261,19 +354,37 @@ fun ChatScreen(vm: AppViewModel) {
             }
         }
         if (vm.busy) Text("Gemini jawab likh raha hai…", Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.labelMedium)
-        Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            OutlinedTextField(
-                value = input, onValueChange = { input = it },
-                modifier = Modifier.weight(1f),
-                placeholder = { Text("Yesmin se kuch bhi poocho…") },
-                maxLines = 4,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                keyboardActions = KeyboardActions(onSend = { vm.send(input, false); input = "" })
-            )
-            Button(onClick = { onMic() }, contentPadding = PaddingValues(14.dp)) {
-                Text(if (vm.voiceState == VoiceState.Listening) "⏹" else "🎤")
+        Surface(
+            shape = RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            modifier = Modifier.fillMaxWidth().padding(8.dp)
+        ) {
+            Row(Modifier.padding(6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                OutlinedTextField(
+                    value = input, onValueChange = { input = it },
+                    modifier = Modifier.weight(1f),
+                    placeholder = { Text("Yesmin se kuch bhi poocho…") },
+                    maxLines = 4,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                    keyboardActions = KeyboardActions(onSend = { vm.send(input, false); input = "" })
+                )
+                Box {
+                    Button(onClick = { showAttach = !showAttach }, contentPadding = PaddingValues(14.dp)) { Text("📎") }
+                    if (showAttach) {
+                        Card(Modifier.align(Alignment.BottomEnd)) {
+                            Column {
+                                TextButton(onClick = { showAttach = false; fileLauncher.launch(arrayOf("*/*")) }) { Text("📁 File bhejo") }
+                                TextButton(onClick = { showAttach = false; imageLauncher.launch("image/*") }) { Text("🖼 Photo bhejo") }
+                                TextButton(onClick = { showAttach = false; cameraLauncher.launch(null) }) { Text("📷 Photo kheencho") }
+                            }
+                        }
+                    }
+                }
+                Button(onClick = { onMic() }, contentPadding = PaddingValues(14.dp)) {
+                    Text(if (vm.voiceState == VoiceState.Listening) "⏹" else "🎤")
+                }
+                Button(onClick = { vm.send(input, false); input = "" }, contentPadding = PaddingValues(14.dp)) { Text("➤") }
             }
-            Button(onClick = { vm.send(input, false); input = "" }, contentPadding = PaddingValues(14.dp)) { Text("➤") }
         }
     }
 }

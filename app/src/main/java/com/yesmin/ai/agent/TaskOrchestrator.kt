@@ -4,17 +4,12 @@ import android.content.Context
 import android.util.Log
 import com.yesmin.ai.MemoryDb
 
-/**
- * Multi-assistant system ka main dimag.
- * Goal sunta hai, samajhta hai, aur sahi agent ko kaam deta hai.
- */
 class TaskOrchestrator(private val context: Context) {
 
     private val whatsappAgent = WhatsAppAgent(context)
     private val termuxAgent = TermuxAgent(context)
     private val memory = MemoryDb(context)
 
-    /** Purana function - purane calls na toote, isliye waisa hi rakha. */
     fun executeTask(goal: String, target: String, message: String) {
         try {
             if (goal.contains("whatsapp", ignoreCase = true)) {
@@ -26,30 +21,18 @@ class TaskOrchestrator(private val context: Context) {
         }
     }
 
-    /**
-     * Naya multi-agent function.
-     * User sirf goal bole, yeh khud decide karega kaun sa agent kaam karega.
-     */
-    fun runGoal(goal: String): String {
+    fun runGoal(goal: String, planner: (suspend (goal: String, lastError: String?) -> String)? = null): String {
         val g = goal.lowercase().trim()
         return try {
             when {
-                // Samajhne wala agent: galat spelling / broken words theek karega
                 g.contains("samajh") || g.contains("kya bola") || g.contains("matlab") ->
                     understandGoal(goal)
 
-                // GitHub agent: push, pull, status, commit
-                g.contains("github") || g.contains("git ") || g.contains("push") ||
-                g.contains("commit") || g.contains("pull") || g.contains("repo") ->
-                    githubTask(goal)
-
-                // Memory agent: yaad rakhna, bhoolna, notes
                 g.contains("yaad") || g.contains("remember") || g.contains("bhool") ||
                 g.contains("note") || g.contains("memory") ->
                     memoryTask(goal)
 
-                // Termux agent: baaki sab technical kaam
-                else -> "Termux agent: " + termuxAgent.executeCommand(goal)
+                else -> termuxSmartTask(goal, planner)
             }
         } catch (e: Exception) {
             Log.e("TaskOrchestrator", "runGoal error: ${e.message}")
@@ -57,7 +40,27 @@ class TaskOrchestrator(private val context: Context) {
         }
     }
 
-    /** Samajhne wala agent - galat spelling ko sahi karke goal clear karta hai. */
+    /** Goal ko Gemini se shell command banwata hai; error par khud fix karke 3 baar try karta hai. */
+    private suspend fun termuxSmartTask(goal: String, planner: (suspend (String, String?) -> String)?): String {
+        if (planner == null) return "Termux agent: " + termuxAgent.executeCommand(goal)
+        var lastError: String? = null
+        repeat(3) {
+            val cmd = planner(goal, lastError).trim()
+            if (cmd.isBlank()) return "Yeh kaam main samajh nahi paayi. Thoda detail mein bolo."
+            if (cmd.startsWith("DONE:")) return cmd.removePrefix("DONE:").trim().ifBlank { "Ho gaya." }
+            if (isDangerous(cmd)) return "Yeh command risky hai, isliye main ise nahi chalaungi."
+            val out = termuxAgent.executeCommand(cmd)
+            if (!out.startsWith("Error:")) return out.ifBlank { "Ho gaya." }
+            lastError = out
+        }
+        return "Kaam poora nahi ho paya. Last error: ${lastError ?: "unknown"}"
+    }
+
+    private fun isDangerous(cmd: String): Boolean {
+        val c = cmd.lowercase()
+        return listOf("rm -rf", "mkfs", "format", "shutdown", "reboot", ":(){:|:&};:").any { c.contains(it) }
+    }
+
     private fun understandGoal(goal: String): String {
         val fixed = goal
             .replace(Regex("thermux|termox|tarmux", RegexOption.IGNORE_CASE), "Termux")
@@ -67,19 +70,6 @@ class TaskOrchestrator(private val context: Context) {
         return "Samajh gayi: $fixed"
     }
 
-    /** GitHub agent - Termux ke through git commands chalata hai. */
-    private fun githubTask(goal: String): String {
-        val cmd = when {
-            goal.contains("status") -> "cd ~/YesminAI && git status"
-            goal.contains("push") -> "cd ~/YesminAI && git add -A && git commit -m \"Yesmin update\" && git push"
-            goal.contains("pull") || goal.contains("update") -> "cd ~/YesminAI && git pull"
-            else -> "cd ~/YesminAI && git status"
-        }
-        val result = termuxAgent.executeCommand(cmd)
-        return "GitHub agent ka result: $result"
-    }
-
-    /** Memory agent - baat yaad rakhta hai. */
     private fun memoryTask(goal: String): String {
         val text = goal.substringAfter("yaad rakho", goal).trim().ifEmpty { goal }
         memory.add("auto", text)

@@ -155,6 +155,7 @@ fun VoiceScreen(vm: AppViewModel) {
         if (vm.voiceSource.isNotBlank()) Text("Awaaz: " + vm.voiceSource, style = MaterialTheme.typography.labelMedium)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (vm.sessionActive) OutlinedButton(onClick = { vm.stopSession() }) { Text("⏹ Stop session") }
+            if (vm.sessionActive) OutlinedButton(onClick = { vm.toggleMicMute() }) { Text(if (vm.micMuted) "🔇 Unmute" else "🎙 Mute") }
             if (vm.voiceState == VoiceState.Speaking) OutlinedButton(onClick = { vm.stopSpeaking() }) { Text("Stop speaking") }
             if (lastReply != null && !lastReply.error) OutlinedButton(onClick = { vm.speakText(lastReply.text) }) { Text("🔊 Replay") }
         }

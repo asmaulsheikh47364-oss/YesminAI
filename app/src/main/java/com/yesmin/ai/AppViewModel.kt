@@ -73,6 +73,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var tempMode by mutableStateOf(false)
     var sessionActive by mutableStateOf(false)
     var sessionPaused by mutableStateOf(false)
+    var micMuted by mutableStateOf(false)
     var voiceSource by mutableStateOf("")
     var openRoute by mutableStateOf<String?>(null)
     private var silentFails = 0
@@ -176,20 +177,35 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (voiceEngine == "gemini" && key != null && disclosure) {
             voiceState = VoiceState.Processing
             viewModelScope.launch {
-                val r = gemini.speech(key, ttsModel(), p.geminiVoice, voice.speakable(text).take(1200))
-                val audio = r.audio
-                if (r.ok && audio != null) {
+                val spoken = voice.speakable(text).take(1200)
+                var audio: ByteArray? = null
+                for (m in ttsCandidates()) {
+                    var r = gemini.speech(key, m, p.geminiVoice, spoken)
+                    if (!r.ok && (r.code == 429 || r.code == 503 || r.code == 500)) {
+                        delay(1500)
+                        r = gemini.speech(key, m, p.geminiVoice, spoken)
+                    }
+                    if (r.ok && r.audio != null) { audio = r.audio; break }
+                }
+                if (audio != null) {
                     voiceSource = "Gemini voice"
                     voiceState = VoiceState.Speaking
                     pcm.play(audio) { afterTurn() }
                 } else {
-                    notice = "Gemini awaaz nahi mili (" + r.text.take(80) + ") — is baar awaaz nahi aayegi, jawab text mein hai."
-                    afterTurn()
+                    notice = "Gemini awaaz nahi mili — phone ki awaaz se bol rahi hoon."
+                    phoneSpeak(text, p.pitch, p.rate)
                 }
             }
         } else {
             afterTurn()
         }
+    }
+
+    private fun ttsCandidates(): List<String> {
+        val ttsModels = models.filter { it.contains("tts", true) && !it.contains("lite", true) }
+        val preferred = ttsModels.filter { it.contains("flash", true) } + ttsModels.filterNot { it.contains("flash", true) }
+        val fallback = listOf("gemini-2.5-flash-preview-tts")
+        return (preferred + fallback).distinct()
     }
 
     private fun phoneSpeak(text: String, pitch: Float, rate: Float) {
@@ -223,7 +239,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         lastUserText = t
         if (saveHistory && !tempMode) db.addHistory(true, t)
         val cmd = CommandRouter.parse(t)
-        if (cmd !is Command.None) handleCommand(cmd, speak) else if (listOf("github", "git ", "git push", "git pull", "repo", "termux").any { t.lowercase().contains(it) }) reply(TaskOrchestrator(ctx).runGoal(t), speak) else if (listOf("button do", "button add", "ui badal", "ui badlo", "design badal", "screen mein add", "copy button").any { t.lowercase().contains(it) }) startAgent(t) else askGemini(speak)
+        if (cmd !is Command.None) handleCommand(cmd, speak) else if (listOf("github", "git ", "git push", "git pull", "repo", "termux").any { t.lowercase().contains(it) }) viewModelScope.launch {
+                val result = TaskOrchestrator(ctx).runGoal(t) { goal, err ->
+                    val prompt = "You convert a user goal into ONE safe bash command for Termux on Android. Goal: " + goal + (if (err != null) " | Previous command failed with this error: " + err + " | Fix the command and try a different safe approach." else "") + " | Reply with ONLY the shell command, no explanation, no markdown. If the goal is already complete or impossible on this phone, reply exactly: DONE: <one short reason>. Never use rm -rf, mkfs, format, shutdown or reboot."
+                    val r = gemini.generate(prefs.apiKey ?: "", model, prompt, listOf("user" to goal), 0.2f)
+                    r.text.trim()
+                }
+                reply(result, speak)
+            } else if (listOf("chrome", "website", "browser").any { t.lowercase().contains(it) }) startUiAgent(t) else if (listOf("button do", "button add", "ui badal", "ui badlo", "design badal", "screen mein add", "copy button").any { t.lowercase().contains(it) }) startAgent(t) else askGemini(speak)
     }
 
     private fun handleCommand(cmd: Command, speak: Boolean) {
@@ -730,7 +753,7 @@ fun runTermuxCommand(command: String) {
         listenJob?.cancel()
         listenJob = viewModelScope.launch {
             delay(700)
-            if (sessionActive && !sessionPaused && voiceState == VoiceState.Idle && !busy) beginListening()
+            if (sessionActive && !sessionPaused && !micMuted && voiceState == VoiceState.Idle && !busy) beginListening()
         }
     }
 
@@ -869,6 +892,17 @@ fun runTermuxCommand(command: String) {
         silentFails = 0
         voiceState = VoiceState.Connecting
         startLive()
+    }
+
+    fun toggleMicMute() {
+        micMuted = !micMuted
+        if (micMuted) {
+            listenJob?.cancel()
+            voice.cancelListening()
+            if (voiceState == VoiceState.Listening) voiceState = VoiceState.Idle
+        } else if (sessionActive && !sessionPaused) {
+            scheduleListen()
+        }
     }
 
     fun stopSession() {
@@ -1055,6 +1089,31 @@ fun runTermuxCommand(command: String) {
         hasYtKey = false
         ytResults = emptyList()
         notice = "YouTube key hata di."
+    }
+
+    fun sendImageToChat(jpeg: ByteArray, question: String) {
+        val q = question.ifBlank { "Is photo mein kya hai?" }
+        messages.add(ChatMsg(true, "📷 Photo bheji: " + q))
+        val key = prefs.apiKey
+        if (key == null) { reply("Pehle AI Brain mein Gemini key daalo.", false, true); return }
+        busy = true
+        viewModelScope.launch {
+            val r = gemini.generateVision(key, model, Personas.toolSystem("Look at the user's photo and answer their question accurately.", language), q, jpeg)
+            busy = false
+            reply(r.text, true, !r.ok)
+        }
+    }
+
+    fun sendFileToChat(name: String, text: String) {
+        messages.add(ChatMsg(true, "📁 File bheji: " + name))
+        val key = prefs.apiKey
+        if (key == null) { reply("Pehle AI Brain mein Gemini key daalo.", false, true); return }
+        busy = true
+        viewModelScope.launch {
+            val r = gemini.generate(key, model, Personas.toolSystem("User ne ek file ka content bheja hai. Ise samajh kar madad karo.", language), listOf("user" to text.take(8000)), temperature)
+            busy = false
+            reply(r.text, true, !r.ok)
+        }
     }
 
     fun askVision(jpeg: ByteArray, question: String) {
