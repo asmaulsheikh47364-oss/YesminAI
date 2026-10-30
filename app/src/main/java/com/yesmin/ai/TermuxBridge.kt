@@ -151,6 +151,7 @@ The user is not a programmer. He gives a goal in plain words; you do the whole j
 ENVIRONMENT: every command runs in a fresh non-interactive bash (no TTY) that starts in the home directory, so start project commands with: cd ~/YesminAI && ...
 Tools available: bash, python3, git, gh (GitHub CLI, already logged in), sed, grep, cat, head, tail, cut, ls, find, zip, curl.
 Never use interactive programs (nano, vim, less, top) or long-running servers.
+WEBSITES AND OTHER PROJECTS: when the goal is about a website or any other project, do the real work yourself and never tell the user to do it. Create or edit the files, git init and commit, create the GitHub repo with gh repo create, push, turn on GitHub Pages with gh api, wait and check with curl that the live link answers, and report the live link. For search visibility add title, meta description, Open Graph tags, a canonical link, sitemap.xml and robots.txt. Never use anything that needs the user's own login; say honestly which last step (for example adding the site in Google Search Console) only he can do. Finish the whole job in one go and do not ask questions that you can answer by looking around.
 PROJECT: Android app Yesmin AI (Kotlin, Jetpack Compose, Gemini) in ~/YesminAI, git branch memory, remote on GitHub. Source is under app/src/main/java/com/yesmin/ai/.
 The phone cannot compile the app. The APK is built by GitHub Actions: push, then run: gh workflow run "Build debug APK" --ref memory ; check with: gh run list --workflow=build.yml --limit 1 ; download with: gh run download <run id> -D ~/apk-out
 To make a brand new Android or other project, create the files with python3 heredocs or cat heredocs and add a GitHub Actions workflow if an APK is wanted.
@@ -198,12 +199,12 @@ Escape newlines inside the cmd string as \n so the JSON stays valid.
         if (h.size <= 16) h else listOf(h.first()) + h.takeLast(14)
 
     suspend fun run(goal: String): String {
-        val allowPush = Regex("(?i)push|build|apk|workflow|deploy|release|banao|bana do|bana de").containsMatchIn(goal)
+        val allowPush = Regex("(?i)push|build|apk|workflow|deploy|release|banao|bana do|bana de|publish|website|site|pages|online|upload|seo").containsMatchIn(goal)
         val hist = ArrayList<Pair<String, String>>()
         hist.add("user" to ("GOAL: " + goal + "\nStart now. Reply with one JSON object only."))
         var geminiFails = 0
         var lastCmd = ""
-        for (step in 1..30) {
+        for (step in 1..45) {
             progress("Step " + step + ": soch rahi hoon")
             val r = gemini.generate(key, model, system, shrink(hist), 0.2f)
             if (!r.ok) {

@@ -48,6 +48,9 @@ class LiveVoice(
     @Volatile private var running = false
     @Volatile private var ready = false
     @Volatile var muted = false
+    @Volatile var skipGreeting = false
+    @Volatile var onNoAudio: ((String) -> Unit)? = null
+    @Volatile private var audioThisTurn = false
     @Volatile private var lastAudioMs = 0L
 
     val isRunning: Boolean get() = running
@@ -159,7 +162,9 @@ class LiveVoice(
                 .also { if (useSearch) it.put(JSONObject().put("googleSearch", JSONObject())) }
                 .put(JSONObject().put("functionDeclarations", JSONArray().put(phoneTool()).put(JSONObject().put("name", "read_screen").put("description", "Returns the text currently visible on the user phone screen. Call it whenever the user asks what is on the screen, asks you to read or explain something shown, or says this or here about something on screen.")).put(JSONObject().put("name", "recent_activity").put("description", "Returns what the user recently did on the phone (taps and screens opened). Call it when the user asks what they just did or what happened.")).put(JSONObject().put("name", "stop_assistant").put("description", "Fully switch Yesmin off. Call it only when the user says her name (Yesmin) and tells her to stop, close or switch off. Say one short goodbye line in the same turn.")).put(JSONObject().put("name", "pause_assistant").put("description", "Make Yesmin quiet for a while. Call it only when the user says her name (Yesmin) and asks her to be quiet or pause for some time. Say one short line like okay in the same turn.")).put(
                     JSONObject().put("name", "get_current_time")
-                        .put("description", "Returns the exact current date and time in India (IST). Call it every time the user asks the time or date.")))))
+                        .put("description", "Returns the exact current date and time in India (IST). Call it every time the user asks the time or date."))
+                    .put(JSONObject().put("name", "get_location").put("description", "Returns the phone current location (coordinates, address and a map link). Call it when the user asks where he is, nearby places, directions or the map.")))))
+
         return JSONObject().put("setup", setup).toString()
     }
 
@@ -169,7 +174,7 @@ class LiveVoice(
             ready = true
             startPlayer()
             startMic()
-            if (reconnects == 0) {
+            if (reconnects == 0 && !skipGreeting) {
                 try {
                     ws?.send(JSONObject().put("realtimeInput", JSONObject().put("text", "The user just woke you by calling your name. Reply right now with one very short, warm greeting in your own words (different each time, for example telling him to go ahead and speak), then wait.")).toString())
                 } catch (e: Exception) {
@@ -212,6 +217,7 @@ class LiveVoice(
                     }
                     val result = when (nm) {
                         "get_current_time" -> f.format(java.util.Date()) + " IST"
+                        "get_location" -> LocationHelper.describe(context)
                         "read_screen" -> YesminAccessibilityService.instance?.dumpScreen() ?: if (YesminAccessibilityService.isEnabledInSettings(context)) "Accessibility Android Settings mein ON hai, lekin Jasmine service abhi connect nahi hai. Screen abhi read nahi ho pa rahi." else "Accessibility Android Settings mein OFF dikh rahi hai."
                         "recent_activity" -> YesminAccessibilityService.instance?.recentActivity()
                             ?: if (YesminAccessibilityService.isEnabledInSettings(context))
@@ -238,6 +244,7 @@ class LiveVoice(
                         held.add(bytes)
                     } else {
                         lastAudioMs = System.currentTimeMillis()
+                        audioThisTurn = true
                         q.offer(bytes)
                         post { onState(VoiceState.Speaking) }
                     }
@@ -266,6 +273,9 @@ class LiveVoice(
                     return
                 }
             }
+            val gotAudio = audioThisTurn
+            audioThisTurn = false
+            if (!gotAudio && m.isNotEmpty() && !quiet) onNoAudio?.let { f -> post { f(m) } }
             post {
                 if (u.isNotEmpty()) onUserText(u)
                 if (m.isNotEmpty()) onModelText(m)
@@ -299,6 +309,16 @@ class LiveVoice(
             while (running) {
                 val b: ByteArray = (try { q.poll(100, TimeUnit.MILLISECONDS) } catch (e: InterruptedException) { null }) ?: continue
                 lastAudioMs = System.currentTimeMillis()
+                run {
+                    var sum = 0.0
+                    var k = 0
+                    while (k + 1 < b.size) {
+                        val sv = ((b[k + 1].toInt() shl 8) or (b[k].toInt() and 0xFF)).toShort().toInt()
+                        sum += sv.toDouble() * sv
+                        k += 2
+                    }
+                    VoiceLevel.out = (Math.sqrt(sum / (b.size / 2).coerceAtLeast(1)) / 6000.0).toFloat().coerceIn(0f, 1f)
+                }
                 try { t.write(b, 0, b.size) } catch (e: Exception) {}
                 lastAudioMs = System.currentTimeMillis()
             }

@@ -89,6 +89,15 @@ fun SettingsScreen(vm: AppViewModel, nav: NavHostController) {
     ) {
         Text("Settings", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
 
+        Section("Kaam ka glass panel") {
+            var glass by remember { mutableStateOf(WorkOverlay.enabled(ctx)) }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Termux ke steps screen par live dikhao", Modifier.weight(1f))
+                Switch(checked = glass, onCheckedChange = { glass = it; WorkOverlay.setEnabled(ctx, it) })
+            }
+            Text("Doosre app ke upar halka glass panel, touch nahi rokta, kaam khatam hote hi chhup jata hai. Display over other apps allow hona chahiye.", style = MaterialTheme.typography.bodySmall)
+        }
+
         Section("Termux (bolkar code likhwana)") {
             val tInstalled = refresh >= 0 && TermuxBridge.installed(ctx)
             val tPerm = refresh >= 0 && TermuxBridge.permitted(ctx)

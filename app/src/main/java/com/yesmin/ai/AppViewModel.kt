@@ -550,7 +550,7 @@ fun runTermuxCommand(command: String) {
         if (!YesminAccessibilityService.isRunning()) return "Accessibility chalu nahi hai. Settings mein Yesmin AI ko ek baar OFF karke phir ON karna hoga."
         uiJob = viewModelScope.launch(kotlinx.coroutines.Dispatchers.Default) {
             val result = try {
-                UiJob(ctx, gemini, key, model) { s -> Dbg.log(ctx, "ui: " + s, false) }.run(goal)
+                UiJob(ctx, gemini, key, model) { s -> Dbg.log(ctx, "ui: " + s, false); WorkOverlay.log(ctx, "Screen: " + s) }.run(goal)
             } catch (e: Exception) {
                 "Screen ka kaam beech mein ruk gaya: " + (e.message ?: "")
             }
@@ -569,11 +569,12 @@ fun runTermuxCommand(command: String) {
         agentStatus = "Shuru: " + goal.take(80)
         agentJob = viewModelScope.launch(kotlinx.coroutines.Dispatchers.Default) {
             val result = try {
-                TermuxJob(ctx, gemini, key, model) { step -> agentStatus = step }.run(goal)
+                TermuxJob(ctx, gemini, key, model) { step -> agentStatus = step; WorkOverlay.log(ctx, step) }.run(goal)
             } catch (e: Exception) {
                 "Kaam beech mein ruk gaya: " + (e.message ?: "")
             }
             agentStatus = "Poora: " + result.take(300)
+            WorkOverlay.log(ctx, "Poora: " + result.take(80))
             live?.tellModel("[TASK RESULT] " + result.take(900) + " (Tell the user this outcome briefly in Hindi.)")
         }
         return "Kaam shuru kar diya. Termux mein chal raha hai, poora hone par bata dungi."
@@ -828,6 +829,8 @@ fun runTermuxCommand(command: String) {
     }
 
     private val liveLog = ArrayList<ChatMsg>()
+    private var liveFails = 0
+    private var liveResumed = false
 
     private fun startLive() {
         val key = prefs.apiKey
@@ -846,7 +849,7 @@ fun runTermuxCommand(command: String) {
         val recentChat = messages.filter { !it.error }.takeLast(12).joinToString("") { (if (it.fromUser) "User" else "Yesmin") + ": " + it.text }
         val system = Personas.chatSystem(persona, language, mem, p.name, p.tone) +
             (if (recentChat.isNotBlank()) "IMPORTANT - RECENT TEXT CHAT HISTORY (user ne text chat mein yeh baatein ki hain, inhe yaad rakho):" + recentChat + "" else "") +
-            " SPEAKING STYLE: Speak like a real, warm human friend - natural pauses, gentle intonation, and emotional warmth in your voice. Never sound robotic or flat. Vary your tone: sometimes soft and caring, sometimes playful, sometimes excited. Use natural fillers like 'hmm', 'achha', 'suno' sparingly to sound human. This is a live voice call: reply in short spoken sentences, no markdown, no lists. You can see the user's phone screen: call read_screen whenever they ask what is on the screen, ask you to read, explain or help with something shown, or say this or here; call recent_activity when they ask what they just did. Describe what you find in simple spoken words and never read out passwords or OTPs. In this live call you CAN control the phone, but only through the phone_command function (the earlier rule that you cannot control the phone does not apply here). Pass the user's request as a short Roman Hindi command, for example: 'torch on karo', 'torch off karo', 'volume badhao', 'volume kam karo', 'volume 50', 'youtube kholo', 'whatsapp kholo', 'arijit singh ke gaane youtube par chalao', 'gaana pause karo', 'next gaana', 'pichla gaana', 'rahul ko call karo', 'rahul ko whatsapp bhejo: kal milte hain', 'wifi on karo', 'battery kitni hai', 'back jao', 'home jao', 'scroll neeche'. Say you did something only if the function result confirms it, and report the result honestly (for example when the user still has to tap or press a button). If the result starts with CONFIRMATION REQUIRED, ask the user in one short sentence and call the function again with confirmed=true only after a clear yes. Never place calls, send messages or do anything that sends, pays or deletes without that confirmation. If the user asks what you or the app can do, answer from ABOUT YOURSELF. TERMUX AND CODING: when the user wants something built or changed, or wants commands run (an app, an APK, a script, git, project edits), turn his short request into a complete goal yourself, say it back in one short sentence, and start it with phone_command using command '@task <full goal with every detail you can infer>'. It runs in the background while you keep chatting; ask at most one short question first, only if the goal is truly unclear. Use '@status' to tell progress. When a message starting with [TASK RESULT] arrives, tell the user the real outcome briefly. Never say you cannot use Termux or cannot make an APK: you run commands in Termux and GitHub builds the APK. MESSAGES: when the user asks you to send a message without giving the exact words (for example a nice shayari for Imran), write the message yourself in his style, read it out for approval, and only then use it with the 'whatsapp bhejo' command; after the draft opens and he says yes, call phone_command with 'tap send' and confirmed=true. If a person's name or an app name sounds like Termux (thermux, thermox) it is the app Termux. CONFIRMATIONS: ask for confirmation at most once per action; after the user says yes call phone_command with confirmed=true and do not ask again; if a result says a contact was not found, tell the user and stop. If the user asks to clear the Termux screen, call phone_command with 'termux clear'. To play a song from YouTube results: call read_screen, pick the best matching title, then phone_command 'tap <a few words of that title>'; to play the first result use 'tap pehla result'; to see more results use 'scroll neeche'. ANY OTHER PHONE TASK: for anything that is not one simple direct command (messaging in any other app, searching inside an app, changing a setting, using an app that was installed later or belongs to another user), start phone_command with '@ui <goal in plain words>'. It controls any app on screen by itself, step by step, and reports back with [UI RESULT]. Never answer that an app has no permission or is not supported; use '@ui' instead and tell the user the real result. READING RULES: When the user asks you to read any text, article, message or screen content: read it in small natural parts of 3-4 sentences, then stop and ask 'aage padhu?'. Remember exactly where you stopped. When the user says 'aage padho', 'continue', or 'aage', read ONLY the next part from where you stopped - never start from the beginning again. If the user says 'poora padho', read the whole thing in parts without stopping. Never claim you finished reading if you only read part of it. Recognize your assistant names as Jasmine, Jasmin, and Yesmin. If the user asks to open Termux, call phone_command with command 'termux kholo'. If the user asks to run a shell command in Termux, state the exact command and ask for a clear yes first; only after the user says yes, call phone_command with command 'termux:<exact shell command>' and confirmed=true. Never infer a shell command from a vague request. The bridge cannot verify command output, so report that honestly. Only if the user says your name (Jasmine, Jasmin, or Yesmin) together with a command: when told to stop, close or switch off, say one short line like okay I am switching off and call stop_assistant; when told to be quiet or pause for some time, say one short okay and call pause_assistant. Never do this without your name being said."
+            " SPEAKING STYLE: Speak like a real, warm human friend - natural pauses, gentle intonation, and emotional warmth in your voice. Never sound robotic or flat. Vary your tone: sometimes soft and caring, sometimes playful, sometimes excited. Use natural fillers like 'hmm', 'achha', 'suno' sparingly to sound human. This is a live voice call: reply in short spoken sentences, no markdown, no lists. You can see the user's phone screen: call read_screen whenever they ask what is on the screen, ask you to read, explain or help with something shown, or say this or here; call recent_activity when they ask what they just did. Describe what you find in simple spoken words and never read out passwords or OTPs. In this live call you CAN control the phone, but only through the phone_command function (the earlier rule that you cannot control the phone does not apply here). Pass the user's request as a short Roman Hindi command, for example: 'torch on karo', 'torch off karo', 'volume badhao', 'volume kam karo', 'volume 50', 'youtube kholo', 'whatsapp kholo', 'arijit singh ke gaane youtube par chalao', 'gaana pause karo', 'next gaana', 'pichla gaana', 'rahul ko call karo', 'rahul ko whatsapp bhejo: kal milte hain', 'wifi on karo', 'battery kitni hai', 'back jao', 'home jao', 'scroll neeche'. Say you did something only if the function result confirms it, and report the result honestly (for example when the user still has to tap or press a button). If the result starts with CONFIRMATION REQUIRED, ask the user in one short sentence and call the function again with confirmed=true only after a clear yes. Never place calls, send messages or do anything that sends, pays or deletes without that confirmation. If the user asks what you or the app can do, answer from ABOUT YOURSELF. TERMUX AND CODING: when the user wants something built or changed, or wants commands run (an app, an APK, a script, git, project edits), turn his short request into a complete goal yourself, say it back in one short sentence, and start it with phone_command using command '@task <full goal with every detail you can infer>'. It runs in the background while you keep chatting; ask at most one short question first, only if the goal is truly unclear. Use '@status' to tell progress. When a message starting with [TASK RESULT] arrives, tell the user the real outcome briefly. Never say you cannot use Termux or cannot make an APK: you run commands in Termux and GitHub builds the APK. MESSAGES: when the user asks you to send a message without giving the exact words (for example a nice shayari for Imran), write the message yourself in his style, read it out for approval, and only then use it with the 'whatsapp bhejo' command; after the draft opens and he says yes, call phone_command with 'tap send' and confirmed=true. If a person's name or an app name sounds like Termux (thermux, thermox) it is the app Termux. ONE ORDER RULE: when the user gives one order, finish the whole job with tools without asking again; ask a question only if something truly essential is missing, and ask all such questions together at once. For websites (publish, deploy, SEO, visibility on Google) start '@task' with the full goal so it is really done instead of telling him what to do himself; say honestly only the last step that needs his own login. If he asks where he is or what is nearby, call get_location. CONFIRMATIONS: ask for confirmation at most once per action; after the user says yes call phone_command with confirmed=true and do not ask again; if a result says a contact was not found, tell the user and stop. If the user asks to clear the Termux screen, call phone_command with 'termux clear'. To play a song from YouTube results: call read_screen, pick the best matching title, then phone_command 'tap <a few words of that title>'; to play the first result use 'tap pehla result'; to see more results use 'scroll neeche'. ANY OTHER PHONE TASK: for anything that is not one simple direct command (messaging in any other app, searching inside an app, changing a setting, using an app that was installed later or belongs to another user), start phone_command with '@ui <goal in plain words>'. It controls any app on screen by itself, step by step, and reports back with [UI RESULT]. Never answer that an app has no permission or is not supported; use '@ui' instead and tell the user the real result. READING RULES: When the user asks you to read any text, article, message or screen content: read it in small natural parts of 3-4 sentences, then stop and ask 'aage padhu?'. Remember exactly where you stopped. When the user says 'aage padho', 'continue', or 'aage', read ONLY the next part from where you stopped - never start from the beginning again. If the user says 'poora padho', read the whole thing in parts without stopping. Never claim you finished reading if you only read part of it. Recognize your assistant names as Jasmine, Jasmin, and Yesmin. If the user asks to open Termux, call phone_command with command 'termux kholo'. If the user asks to run a shell command in Termux, state the exact command and ask for a clear yes first; only after the user says yes, call phone_command with command 'termux:<exact shell command>' and confirmed=true. Never infer a shell command from a vague request. The bridge cannot verify command output, so report that honestly. Only if the user says your name (Jasmine, Jasmin, or Yesmin) together with a command: when told to stop, close or switch off, say one short line like okay I am switching off and call stop_assistant; when told to be quiet or pause for some time, say one short okay and call pause_assistant. Never do this without your name being said."
         voiceState = VoiceState.Connecting
         viewModelScope.launch {
             val all = gemini.liveModels(key).filter { !it.contains("translate", true) }
@@ -862,21 +865,37 @@ fun runTermuxCommand(command: String) {
             live?.stop()
             val lv = LiveVoice(
                 context = ctx,
-                onState = { if (sessionActive && !sessionPaused) voiceState = it },
+                onState = { if (sessionActive && !sessionPaused) { voiceState = it; if (it == VoiceState.Listening) liveFails = 0 } },
                 onUserText = { liveLog.add(ChatMsg(true, it)); messages.add(ChatMsg(true, it)); if (liveLog.size > 200) liveLog.removeAt(0) },
                 onModelText = { liveLog.add(ChatMsg(false, it)); messages.add(ChatMsg(false, it)); if (liveLog.size > 200) liveLog.removeAt(0); autoRemember() },
                 onLevel = { micLevel = it },
                 onTool = { c, ok -> liveCommand(c, ok) },
                 onCommand = { c -> if (c == "stop") { try { StandbyService.start(ctx) } catch (e: Exception) {}; stopSession() } else { live?.quiet = true; voiceState = VoiceState.Listening } },
                 onError = { msg ->
-                    messages.add(ChatMsg(false, msg, true))
-                    stopSession()
-                    voiceState = VoiceState.Error
+                    val low = msg.lowercase()
+                    val fatal = low.contains("limit") || low.contains("key") || low.contains("permission")
+                    if (sessionActive && !sessionPaused && !fatal && liveFails < 12) {
+                        liveFails++
+                        liveResumed = true
+                        Dbg.log(ctx, "live restart " + liveFails + ": " + msg.take(100), false)
+                        voiceState = VoiceState.Connecting
+                        viewModelScope.launch {
+                            delay(1200L * liveFails)
+                            if (sessionActive && !sessionPaused) startLive()
+                        }
+                    } else {
+                        messages.add(ChatMsg(false, msg, true))
+                        stopSession()
+                        voiceState = VoiceState.Error
+                    }
                 }
             )
             live = lv
             voiceSource = "Gemini Live"
+            lv.skipGreeting = liveResumed
+            lv.onNoAudio = { t -> if (sessionActive && !sessionPaused && !micMuted) phoneSpeak(t, p.pitch, p.rate) }
             lv.start(key, m, system, p.geminiVoice)
+            lv.muted = micMuted
         }
     }
 
@@ -902,6 +921,7 @@ fun runTermuxCommand(command: String) {
 
     fun toggleMicMute() {
         micMuted = !micMuted
+        live?.muted = micMuted
         if (micMuted) {
             listenJob?.cancel()
             voice.cancelListening()
@@ -912,6 +932,9 @@ fun runTermuxCommand(command: String) {
     }
 
     fun stopSession() {
+        liveResumed = false
+        liveFails = 0
+        WorkOverlay.hide()
         autoRemember(true)
         live?.stop()
         live = null
@@ -1097,14 +1120,22 @@ fun runTermuxCommand(command: String) {
         notice = "YouTube key hata di."
     }
 
+    suspend fun describeFrame(jpeg: ByteArray): String {
+        val key = prefs.apiKey ?: return "Pehle Gemini key daalo."
+        toolBusy = true
+        val r = gemini.generateVision(key, model, Personas.toolSystem(VisionPrompts.CAMERA, language), "Yeh abhi camera mein kya hai? Batao aur samjhao.", jpeg)
+        toolBusy = false
+        return r.text
+    }
+
     fun sendImageToChat(jpeg: ByteArray, question: String) {
-        val q = question.ifBlank { "Is photo mein kya hai?" }
-        messages.add(ChatMsg(true, "📷 Photo bheji: " + q))
+        val q = question.ifBlank { VisionPrompts.Q }
+        messages.add(ChatMsg(true, "📷 Photo bheji"))
         val key = prefs.apiKey
         if (key == null) { reply("Pehle AI Brain mein Gemini key daalo.", false, true); return }
         busy = true
         viewModelScope.launch {
-            val r = gemini.generateVision(key, model, Personas.toolSystem("Look at the user's photo and answer their question accurately.", language), q, jpeg)
+            val r = gemini.generateVision(key, model, Personas.toolSystem(VisionPrompts.READ, language), q, jpeg)
             busy = false
             reply(r.text, true, !r.ok)
         }
@@ -1130,8 +1161,8 @@ fun runTermuxCommand(command: String) {
         viewModelScope.launch {
             val r = gemini.generateVision(
                 key, model,
-                Personas.toolSystem("Look at the user's photo and answer their question accurately. Say so if you cannot tell something.", language),
-                question.ifBlank { "Is photo mein kya hai?" }, jpeg
+                Personas.toolSystem(VisionPrompts.READ, language),
+                question.ifBlank { VisionPrompts.Q }, jpeg
             )
             visionOutput = r.text
             toolBusy = false

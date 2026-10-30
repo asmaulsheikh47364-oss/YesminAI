@@ -41,7 +41,7 @@ import java.io.ByteArrayOutputStream
 object ImageUtil {
     fun toJpeg(b: Bitmap): ByteArray {
         val out = ByteArrayOutputStream()
-        b.compress(Bitmap.CompressFormat.JPEG, 85, out)
+        b.compress(Bitmap.CompressFormat.JPEG, 93, out)
         return out.toByteArray()
     }
 
@@ -50,7 +50,7 @@ object ImageUtil {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         ctx.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
         var sample = 1
-        while (bounds.outWidth / sample > 1600 || bounds.outHeight / sample > 1600) sample *= 2
+        while (bounds.outWidth / sample > 2400 || bounds.outHeight / sample > 2400) sample *= 2
         val opts = BitmapFactory.Options().apply { inSampleSize = sample }
         val bmp = ctx.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opts) }
         if (bmp == null) null else toJpeg(bmp)
@@ -63,7 +63,7 @@ object ImageUtil {
 fun VisionScreen(vm: AppViewModel) {
     val ctx = LocalContext.current
     var jpeg by remember { mutableStateOf<ByteArray?>(null) }
-    var question by remember { mutableStateOf("Is photo mein kya hai? Aasaan Hindi mein batao.") }
+    var question by remember { mutableStateOf(VisionPrompts.Q) }
     val gallery = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         if (uri != null) {
             val b = ImageUtil.fromUri(ctx, uri)

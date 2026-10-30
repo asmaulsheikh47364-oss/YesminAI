@@ -44,7 +44,7 @@ private fun granted(ctx: Context, p: String): Boolean =
     ContextCompat.checkSelfPermission(ctx, p) == android.content.pm.PackageManager.PERMISSION_GRANTED
 
 private fun runtimeMissing(ctx: Context): List<String> {
-    val l = mutableListOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.READ_CONTACTS)
+    val l = mutableListOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.READ_CONTACTS, Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.CAMERA)
     if (android.os.Build.VERSION.SDK_INT >= 33) l.add(Manifest.permission.POST_NOTIFICATIONS)
     if (TermuxBridge.installed(ctx)) l.add(TermuxBridge.PERM)
     return l.filter { !granted(ctx, it) }
@@ -87,6 +87,8 @@ fun PermissionSetup() {
     val items = ArrayList<PermItem>()
     items.add(PermItem("Microphone", "Aapki awaaz sunne ke liye", ok && granted(ctx, Manifest.permission.RECORD_AUDIO)) { launcher.launch(arrayOf(Manifest.permission.RECORD_AUDIO)) })
     items.add(PermItem("Contacts", "Naam se call ya message ke liye", ok && granted(ctx, Manifest.permission.READ_CONTACTS)) { launcher.launch(arrayOf(Manifest.permission.READ_CONTACTS)) })
+    items.add(PermItem("Location", "Aap kahan hain ye batane aur map ke kaam ke liye", ok && granted(ctx, Manifest.permission.ACCESS_FINE_LOCATION)) { launcher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)) })
+    items.add(PermItem("Camera", "Camera se cheezein dekhne aur samjhane ke liye", ok && granted(ctx, Manifest.permission.CAMERA)) { launcher.launch(arrayOf(Manifest.permission.CAMERA)) })
     if (android.os.Build.VERSION.SDK_INT >= 33) {
         items.add(PermItem("Notifications", "Voice session ka status dikhane ke liye", ok && granted(ctx, Manifest.permission.POST_NOTIFICATIONS)) { launcher.launch(arrayOf(Manifest.permission.POST_NOTIFICATIONS)) })
     }

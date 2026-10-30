@@ -149,25 +149,25 @@ fun CodeBlock(raw: String, onSave: ((String) -> Unit)?) {
 @Composable
 fun Bubble(m: ChatMsg, vm: AppViewModel) {
     val clipboard = LocalClipboardManager.current
-    Row(
-        Modifier.fillMaxWidth(),
-        horizontalArrangement = if (m.fromUser) Arrangement.End else Arrangement.Start
-    ) {
-        Surface(
-            color = when {
-                m.fromUser -> MaterialTheme.colorScheme.primaryContainer
-                m.error -> MaterialTheme.colorScheme.errorContainer
-                else -> MaterialTheme.colorScheme.surfaceVariant
-            },
-            shape = RoundedCornerShape(18.dp),
-            modifier = Modifier.widthIn(max = 320.dp)
-        ) {
-            Column(Modifier.padding(12.dp)) {
-                if (m.fromUser) Text(m.text) else RichText(m.text, onSave = { vm.addMemory("snippet", it) })
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    TextButton(onClick = { clipboard.setText(AnnotatedString(m.text)) }) { Text("⧉ Copy") }
-                    if (!m.fromUser && !m.error) TextButton(onClick = { vm.speakText(m.text) }) { Text("🔊 Suno") }
-                }
+    if (m.fromUser) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                shape = RoundedCornerShape(22.dp),
+                modifier = Modifier.widthIn(max = 300.dp)
+            ) {
+                Text(m.text, Modifier.padding(horizontal = 16.dp, vertical = 11.dp))
+            }
+        }
+    } else {
+        Column(Modifier.fillMaxWidth().padding(end = 6.dp)) {
+            Text("✦ Yesmin", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.labelLarge)
+            Column(Modifier.padding(top = 6.dp)) {
+                if (m.error) Text(m.text, color = MaterialTheme.colorScheme.error) else RichText(m.text, onSave = { vm.addMemory("snippet", it) })
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                TextButton(onClick = { clipboard.setText(AnnotatedString(m.text)) }) { Text("⧉", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                if (!m.error) TextButton(onClick = { vm.speakText(m.text) }) { Text("🔊", color = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
         }
     }
@@ -214,8 +214,16 @@ fun HomeScreen(vm: AppViewModel, nav: NavHostController) {
         quick.chunked(2).forEach { row ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 row.forEach { (label, cmd) ->
-                    FilledTonalButton(
+                    val tint = listOf(
+                        androidx.compose.ui.graphics.Color(0xFFDC2626), androidx.compose.ui.graphics.Color(0xFF16A34A),
+                        androidx.compose.ui.graphics.Color(0xFF2563EB), androidx.compose.ui.graphics.Color(0xFF7C3AED)
+                    )[quick.indexOfFirst { it.first == label }.coerceAtLeast(0) % 4]
+                    Button(
                         onClick = { vm.send(cmd, false); nav.navigate("chat") { launchSingleTop = true } },
+                        shape = RoundedCornerShape(16.dp),
+                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                            containerColor = tint, contentColor = androidx.compose.ui.graphics.Color.White
+                        ),
                         modifier = Modifier.weight(1f)
                     ) { Text(label, maxLines = 1) }
                 }
@@ -251,11 +259,11 @@ fun ChatScreen(vm: AppViewModel) {
     val imageLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
             val b = ImageUtil.fromUri(ctx, uri)
-            if (b != null) vm.sendImageToChat(b, "Is photo mein kya hai?")
+            if (b != null) vm.sendImageToChat(b, VisionPrompts.Q)
         }
     }
     val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bmp ->
-        if (bmp != null) vm.sendImageToChat(ImageUtil.toJpeg(bmp), "Is photo mein kya hai?")
+        if (bmp != null) vm.sendImageToChat(ImageUtil.toJpeg(bmp), VisionPrompts.Q)
     }
     val listState = rememberLazyListState()
     LaunchedEffect(vm.messages.size) {
@@ -358,7 +366,7 @@ fun ChatScreen(vm: AppViewModel) {
         }
         if (vm.busy) Text("Gemini jawab likh raha hai…", Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.labelMedium)
         Surface(
-            shape = RoundedCornerShape(24.dp),
+            shape = RoundedCornerShape(30.dp),
             color = MaterialTheme.colorScheme.surfaceVariant,
             modifier = Modifier.fillMaxWidth().padding(8.dp)
         ) {
@@ -366,13 +374,17 @@ fun ChatScreen(vm: AppViewModel) {
                 OutlinedTextField(
                     value = input, onValueChange = { input = it },
                     modifier = Modifier.weight(1f),
+                    colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = androidx.compose.ui.graphics.Color.Transparent,
+                        unfocusedBorderColor = androidx.compose.ui.graphics.Color.Transparent
+                    ),
                     placeholder = { Text("Yesmin se kuch bhi poocho…") },
                     maxLines = 4,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                     keyboardActions = KeyboardActions(onSend = { vm.send(input, false); input = "" })
                 )
                 Box {
-                    Button(onClick = { showAttach = !showAttach }, contentPadding = PaddingValues(14.dp)) { Text("📎") }
+                    FilledTonalButton(onClick = { showAttach = !showAttach }, shape = CircleShape, contentPadding = PaddingValues(14.dp)) { Text("📎") }
                     if (showAttach) {
                         Card(Modifier.align(Alignment.BottomEnd)) {
                             Column {
@@ -383,10 +395,10 @@ fun ChatScreen(vm: AppViewModel) {
                         }
                     }
                 }
-                Button(onClick = { onMic() }, contentPadding = PaddingValues(14.dp)) {
+                FilledTonalButton(onClick = { onMic() }, shape = CircleShape, contentPadding = PaddingValues(14.dp)) {
                     Text(if (vm.voiceState == VoiceState.Listening) "⏹" else "🎤")
                 }
-                Button(onClick = { vm.send(input, false); input = "" }, contentPadding = PaddingValues(14.dp)) { Text("➤") }
+                Button(onClick = { vm.send(input, false); input = "" }, shape = CircleShape, contentPadding = PaddingValues(14.dp)) { Text("↑") }
             }
         }
     }

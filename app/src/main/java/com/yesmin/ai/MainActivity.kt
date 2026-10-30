@@ -155,7 +155,7 @@ fun MainScaffold(vm: AppViewModel) {
         }
     }
     val tabs = listOf(
-        Tab("home", "Home", "🏠"), Tab("chat", "Chat", "💬"), Tab("brain", "AI Brain", "🧠"), Tab("more", "More", "☰")
+        Tab("home", "Home", "🏠"), Tab("chat", "Chat", "💬"), Tab("camera", "Camera", "📷"), Tab("brain", "AI Brain", "🧠"), Tab("more", "More", "☰")
     )
     val moreRoutes = setOf("more", "apps", "calc", "support", "vision")
     Scaffold(
@@ -181,7 +181,10 @@ fun MainScaffold(vm: AppViewModel) {
                         selected = selected,
                         onClick = { navTab(nav, t.route) },
                         icon = { Text(t.icon) },
-                        label = { Text(t.label) }
+                        label = { Text(t.label) },
+                        colors = androidx.compose.material3.NavigationBarItemDefaults.colors(
+                            indicatorColor = MaterialTheme.colorScheme.primaryContainer
+                        )
                     )
                 }
             }
@@ -201,6 +204,7 @@ fun MainScaffold(vm: AppViewModel) {
             composable("support") { SupportScreen(vm) }
             composable("profiles") { ProfilesScreen(vm) }
             composable("vision") { VisionScreen(vm) }
+            composable("camera") { CameraScreen(vm) }
         }
     }
 }

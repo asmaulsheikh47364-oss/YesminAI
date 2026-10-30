@@ -42,6 +42,9 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
@@ -62,25 +65,49 @@ private const val RING_R = 0.43f
 
 @Composable
 fun HomeHero(vm: AppViewModel, greeting: String, onMic: () -> Unit) {
-    val img = ImageBitmap.imageResource(R.drawable.yesmin_hero)
-    val ratio = img.width / (CROP_H * img.height)
-
+    val img = ImageBitmap.imageResource(R.drawable.yesmin_portrait)
     val inf = rememberInfiniteTransition(label = "hero")
-    val spin by inf.animateFloat(
-        initialValue = 0f, targetValue = 360f,
-        animationSpec = infiniteRepeatable(tween(16000, easing = LinearEasing), RepeatMode.Restart), label = "spin"
+    val sway by inf.animateFloat(
+        initialValue = -1f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(5200, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "sway"
     )
-    val breathe by inf.animateFloat(
-        initialValue = 0f, targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(4200, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "breathe"
+    val wind by inf.animateFloat(
+        initialValue = -1f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(3100, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "wind"
+    )
+    val gazeX by inf.animateFloat(
+        initialValue = -1f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(2700, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "gx"
+    )
+    val gazeY by inf.animateFloat(
+        initialValue = -1f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(4300, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "gy"
     )
     val talk by inf.animateFloat(
-        initialValue = 0.3f, targetValue = 0.9f,
-        animationSpec = infiniteRepeatable(tween(450), RepeatMode.Reverse), label = "talk"
+        initialValue = 0.2f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(230), RepeatMode.Reverse), label = "talk"
     )
+    val spin by inf.animateFloat(
+        initialValue = 0f, targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(18000, easing = LinearEasing), RepeatMode.Restart), label = "spin"
+    )
+    val blink = remember { androidx.compose.animation.core.Animatable(0f) }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(2000L + (Math.random() * 3500).toLong())
+            blink.animateTo(1f, tween(80))
+            blink.animateTo(0f, tween(120))
+            if (Math.random() < 0.25) {
+                kotlinx.coroutines.delay(130)
+                blink.animateTo(1f, tween(80))
+                blink.animateTo(0f, tween(120))
+            }
+        }
+    }
+    val speaking = vm.voiceState == VoiceState.Speaking
     val raw = when (vm.voiceState) {
         VoiceState.Listening -> vm.micLevel
-        VoiceState.Speaking -> talk
+        VoiceState.Speaking -> 0.7f
         VoiceState.Processing, VoiceState.Connecting -> 0.2f
         else -> 0.05f
     }
@@ -88,63 +115,113 @@ fun HomeHero(vm: AppViewModel, greeting: String, onMic: () -> Unit) {
     val bg = MaterialTheme.colorScheme.background
 
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            "Yesmin AI", style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary
-        )
-        Text("Your Personal Assistant", style = MaterialTheme.typography.bodyMedium)
-
-        Box(Modifier.fillMaxWidth().aspectRatio(ratio).clipToBounds()) {
-            Canvas(
-                Modifier.fillMaxSize().graphicsLayer {
-                    val s = 1f + 0.035f * breathe + 0.03f * level
-                    scaleX = s
-                    scaleY = s
+        Box(
+            Modifier
+                .layout { m, c ->
+                    val extra = 32.dp.roundToPx()
+                    val p = m.measure(c.copy(minWidth = c.maxWidth + extra, maxWidth = c.maxWidth + extra))
+                    layout(c.maxWidth, p.height) { p.place(-extra / 2, 0) }
                 }
-            ) {
-                drawImage(
-                    image = img,
-                    srcOffset = IntOffset(0, (CROP_TOP * img.height).toInt()),
-                    srcSize = IntSize(img.width, (CROP_H * img.height).toInt()),
-                    dstSize = IntSize(size.width.toInt(), size.height.toInt()),
-                    filterQuality = FilterQuality.Medium
-                )
-            }
+                .fillMaxWidth()
+                .aspectRatio(1f)
+        ) {
             Canvas(Modifier.fillMaxSize()) {
-                val c = Offset(size.width * RING_CX, size.height * RING_CY)
-                val r = size.width * (RING_R - 0.015f + 0.02f * breathe + 0.025f * level)
-                val tl = Offset(c.x - r, c.y - r)
-                val sz = Size(r * 2f, r * 2f)
-                val a = 0.35f + 0.55f * level
-                val brush = Brush.sweepGradient(
-                    0.00f to Color.Transparent,
-                    0.18f to NeonCyan,
-                    0.40f to NeonViolet,
-                    0.55f to Color.Transparent,
-                    0.75f to NeonPink,
-                    0.90f to NeonViolet,
-                    1.00f to Color.Transparent,
-                    center = c
-                )
-                clipRect(0f, 0f, size.width, size.height * 0.80f) {
-                    rotate(spin, c) {
-                        drawArc(
-                            brush, 0f, 360f, false, tl, sz, alpha = a * 0.35f,
-                            style = Stroke(width = 26.dp.toPx(), cap = StrokeCap.Round), blendMode = BlendMode.Plus
-                        )
-                        drawArc(
-                            brush, 0f, 360f, false, tl, sz, alpha = a,
-                            style = Stroke(width = 4.dp.toPx(), cap = StrokeCap.Round), blendMode = BlendMode.Plus
+                val w = size.width
+                val iw = img.width
+                val ih = img.height
+                val skin = Color(0xFFE8B4A0)
+                val lash = Color(0xFF1B1008)
+
+                withTransform({
+                    rotate(sway * 0.9f, Offset(w * 0.5f, w * 0.96f))
+                    translate(sway * w * 0.004f, level * w * -0.004f)
+                }) {
+                    drawImage(img, dstSize = IntSize(w.toInt(), w.toInt()), filterQuality = FilterQuality.Medium)
+
+                    // hair locks move a little in the air
+                    val locks = listOf(floatArrayOf(0.20f, 0.42f, 0.20f, 0.38f), floatArrayOf(0.72f, 0.52f, 0.10f, 0.30f))
+                    for ((i, l) in locks.withIndex()) {
+                        drawImage(
+                            img,
+                            srcOffset = IntOffset((l[0] * iw).toInt(), (l[1] * ih).toInt()),
+                            srcSize = IntSize((l[2] * iw).toInt(), (l[3] * ih).toInt()),
+                            dstOffset = IntOffset((l[0] * w + wind * w * 0.007f * (if (i == 0) 1f else -1f)).toInt(), (l[1] * w).toInt()),
+                            dstSize = IntSize((l[2] * w).toInt(), (l[3] * w).toInt()),
+                            alpha = 0.55f, filterQuality = FilterQuality.Medium
                         )
                     }
+                    // hair bun and clip sparkle sway
+                    drawImage(
+                        img,
+                        srcOffset = IntOffset((0.34f * iw).toInt(), (0.03f * ih).toInt()),
+                        srcSize = IntSize((0.24f * iw).toInt(), (0.16f * ih).toInt()),
+                        dstOffset = IntOffset((0.34f * w + wind * w * 0.006f).toInt(), (0.03f * w).toInt()),
+                        dstSize = IntSize((0.24f * w).toInt(), (0.16f * w).toInt()),
+                        alpha = 0.5f, filterQuality = FilterQuality.Medium
+                    )
+
+                    // eyes: iris moves, eyelids blink
+                    val eyes = listOf(0.443f to 0.656f, 0.648f to 0.656f)
+                    val rx = 0.072f
+                    val ry = 0.046f
+                    for (e in eyes) {
+                        val left = (e.first - rx) * w
+                        val top = (e.second - ry) * w
+                        val path = Path()
+                        path.addOval(androidx.compose.ui.geometry.Rect(left, top, left + 2 * rx * w, top + 2 * ry * w))
+                        clipPath(path) {
+                            drawImage(
+                                img,
+                                srcOffset = IntOffset(((e.first - rx) * iw).toInt(), ((e.second - ry) * ih).toInt()),
+                                srcSize = IntSize((2 * rx * iw).toInt(), (2 * ry * ih).toInt()),
+                                dstOffset = IntOffset((left + gazeX * w * 0.010f).toInt(), (top + gazeY * w * 0.006f).toInt()),
+                                dstSize = IntSize((2 * rx * w).toInt(), (2 * ry * w).toInt()),
+                                filterQuality = FilterQuality.Medium
+                            )
+                            val b = blink.value
+                            if (b > 0.02f) {
+                                drawRect(skin, Offset(left, top), Size(2 * rx * w, 2 * ry * w * b))
+                                val ly = top + 2 * ry * w * b
+                                drawLine(lash, Offset(left + rx * w * 0.15f, ly), Offset(left + rx * w * 1.85f, ly), strokeWidth = 3.dp.toPx(), cap = StrokeCap.Round)
+                            }
+                        }
+                    }
+
+                    // mouth follows her voice
+                    val mo = if (speaking) ((0.12f + 2.6f * VoiceLevel.out) * (0.6f + 0.4f * talk)).coerceIn(0f, 1f) else 0f
+                    if (mo > 0.06f) {
+                        val mw = w * (0.040f + 0.016f * mo)
+                        val mh = w * 0.030f * mo
+                        val cx = w * 0.544f
+                        val cy = w * 0.868f
+                        drawOval(Color(0xFF4A1818), Offset(cx - mw, cy - mh * 0.5f), Size(mw * 2f, mh))
+                        drawOval(Color(0xFFB5605A), Offset(cx - mw, cy - mh * 0.5f), Size(mw * 2f, mh), style = Stroke(width = 2.dp.toPx()))
+                    }
+                }
+
+                // soft golden ring around the head
+                val c = Offset(w * 0.5f, w * 0.47f)
+                val rr = w * (0.44f + 0.02f * level)
+                val brush = Brush.sweepGradient(
+                    0.00f to Color.Transparent, 0.25f to Color(0xFFFFD166), 0.50f to Color.Transparent,
+                    0.75f to Color(0xFFFFB347), 1.00f to Color.Transparent, center = c
+                )
+                rotate(spin, c) {
+                    drawArc(
+                        brush, 0f, 360f, false, Offset(c.x - rr, c.y - rr), Size(rr * 2f, rr * 2f),
+                        alpha = 0.10f + 0.40f * level, style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round), blendMode = BlendMode.Plus
+                    )
                 }
             }
+            // soft fade on every edge so the picture melts into the screen
             Box(
                 Modifier.fillMaxSize().background(
-                    Brush.verticalGradient(
-                        0.00f to bg, 0.12f to Color.Transparent,
-                        0.65f to Color.Transparent, 1.00f to bg
-                    )
+                    Brush.verticalGradient(0.00f to bg, 0.14f to Color.Transparent, 0.62f to Color.Transparent, 1.00f to bg)
+                )
+            )
+            Box(
+                Modifier.fillMaxSize().background(
+                    Brush.horizontalGradient(0.00f to bg, 0.16f to Color.Transparent, 0.84f to Color.Transparent, 1.00f to bg)
                 )
             )
         }
@@ -153,24 +230,24 @@ fun HomeHero(vm: AppViewModel, greeting: String, onMic: () -> Unit) {
             Modifier
                 .layout { m, c ->
                     val p = m.measure(c)
-                    val up = 44.dp.roundToPx()
+                    val up = 64.dp.roundToPx()
                     layout(p.width, p.height - up) { p.place(0, -up) }
                 }
                 .padding(horizontal = 4.dp)
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(26.dp))
-                .background(Color(0xE60B1236))
-                .border(1.5.dp, NeonBrush, RoundedCornerShape(26.dp))
+                .background(Color(0xB30B1236))
+                .border(1.dp, Color(0x55FFFFFF), RoundedCornerShape(26.dp))
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Text(
-                greeting + "! \uD83D\uDE0A", fontWeight = FontWeight.Bold,
+                greeting + "! 😊", fontWeight = FontWeight.Bold,
                 fontSize = 20.sp, color = Color.White, textAlign = TextAlign.Center
             )
             Text(
-                "I'm " + vm.activeProfile().name + ", your AI assistant. How can I help you today?",
+                "I'm " + vm.activeProfile().name + ". How can I help you today?",
                 style = MaterialTheme.typography.bodyMedium, color = Color.White, textAlign = TextAlign.Center
             )
             Row(
@@ -183,13 +260,12 @@ fun HomeHero(vm: AppViewModel, greeting: String, onMic: () -> Unit) {
                 MiniWave(level, 1.7f, Modifier.weight(1f))
             }
             Text(
-                "\u25CF " + vm.statusLabel() + "  \u00B7  Gemini: " + vm.brainStatus.label(),
+                "● " + vm.statusLabel() + "  ·  Gemini: " + vm.brainStatus.label(),
                 style = MaterialTheme.typography.labelMedium, color = Color(0xFFB6C2E2)
             )
         }
     }
 }
-
 @Composable
 private fun MiniWave(level: Float, shift: Float, modifier: Modifier) {
     val t by rememberInfiniteTransition(label = "wave").animateFloat(
