@@ -10,7 +10,7 @@ import java.net.SocketTimeoutException
 import java.net.URL
 import java.net.UnknownHostException
 
-data class AiResult(val ok: Boolean, val text: String, val models: List<String> = emptyList(), val audio: ByteArray? = null, val code: Int = 0)
+data class AiResult(val ok: Boolean, val text: String, val models: List<String> = emptyList(), val audio: ByteArray? = null, val code: Int = 0, val image: ByteArray? = null)
 
 /** Talks to the official Gemini REST API (v1beta). The API key is sent only in a header, never logged. */
 class GeminiClient {
@@ -30,7 +30,7 @@ class GeminiClient {
                 val n = m.optString("name").removePrefix("models/")
                 if (can && n.startsWith("gemini")) names.add(n)
             }
-            AiResult(true, "Key valid hai. ${names.size} Gemini models mile.", names.sortedDescending())
+            AiResult(true, "Key valid hai. ${names.size} models mile.", names.sortedDescending())
         } catch (e: Exception) {
             AiResult(false, netError(e), code = -1)
         }
@@ -90,7 +90,7 @@ class GeminiClient {
             val cands = j.optJSONArray("candidates")
             if (cands == null || cands.length() == 0) {
                 val reason = j.optJSONObject("promptFeedback")?.optString("blockReason").orEmpty()
-                return@withContext AiResult(false, "Gemini ne jawab nahi diya" + if (reason.isNotBlank()) " (blocked: $reason)." else ".")
+                return@withContext AiResult(false, "Payal ne jawab nahi diya" + if (reason.isNotBlank()) " (blocked: $reason)." else ".")
             }
             val parts = cands.getJSONObject(0).optJSONObject("content")?.optJSONArray("parts")
             if (parts == null) {
@@ -129,7 +129,7 @@ class GeminiClient {
             if (r.first != 200) return@withContext AiResult(false, friendly(r.first, r.second, m), code = r.first)
             val cands = JSONObject(r.second).optJSONArray("candidates")
             val ps = cands?.optJSONObject(0)?.optJSONObject("content")?.optJSONArray("parts")
-            if (ps == null) return@withContext AiResult(false, "Gemini ne photo ka jawab nahi diya.")
+            if (ps == null) return@withContext AiResult(false, "Payal ne photo ka jawab nahi diya.")
             val sb = StringBuilder()
             for (i in 0 until ps.length()) sb.append(ps.getJSONObject(i).optString("text"))
             val out = sb.toString().trim()
@@ -175,6 +175,40 @@ class GeminiClient {
         }
     }
 
+    /** Makes a picture from a description. Tries the known image models one after another. */
+    suspend fun generateImage(key: String, prompt: String): AiResult = withContext(Dispatchers.IO) {
+        var last = AiResult(false, "Photo banane wala model nahi mila.")
+        for (m in listOf("gemini-2.5-flash-image", "gemini-2.5-flash-image-preview", "gemini-3-pro-image-preview")) {
+            try {
+                val gen = JSONObject().put("responseModalities", JSONArray().put("IMAGE").put("TEXT"))
+                val body = JSONObject()
+                    .put("contents", JSONArray().put(JSONObject().put("parts", JSONArray().put(JSONObject().put("text", prompt)))))
+                    .put("generationConfig", gen)
+                val r = request("POST", "$base/models/$m:generateContent", key, body.toString())
+                if (r.first == 404) continue
+                if (r.first != 200) {
+                    last = AiResult(false, "Photo nahi ban payi: " + friendly(r.first, r.second, m), code = r.first)
+                    if (r.first == 429 || r.first == 403) break
+                    continue
+                }
+                val parts = JSONObject(r.second).optJSONArray("candidates")?.optJSONObject(0)
+                    ?.optJSONObject("content")?.optJSONArray("parts")
+                var data: String? = null
+                if (parts != null) {
+                    for (i in 0 until parts.length()) {
+                        val d = parts.getJSONObject(i).optJSONObject("inlineData")?.optString("data")
+                        if (!d.isNullOrEmpty()) data = d
+                    }
+                }
+                if (data != null) return@withContext AiResult(true, "ok", image = android.util.Base64.decode(data, android.util.Base64.DEFAULT))
+                last = AiResult(false, "Photo nahi bani. Thoda alag tarike se bolkar dekho.")
+            } catch (e: Exception) {
+                last = AiResult(false, netError(e), code = -1)
+            }
+        }
+        last
+    }
+
     private fun request(method: String, url: String, key: String, body: String?): Pair<Int, String> {
         val c = URL(url).openConnection() as HttpURLConnection
         try {
@@ -209,7 +243,7 @@ class GeminiClient {
                 if (daily) "Aaj ki quota khatam ho gayi hai. Kal dobara try karo ya Google AI Studio mein plan/billing dekho."
                 else "Bahut tez requests (rate limit). ~" + (retry ?: 30) + " second baad try karo."
             }
-            code >= 500 -> "Gemini server par problem ($code). Baad mein try karo."
+            code >= 500 -> "AI server par problem ($code). Baad mein try karo."
             else -> "Error $code: ${msg.take(160)}"
         }
     }

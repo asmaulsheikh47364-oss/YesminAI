@@ -77,7 +77,7 @@ fun OnboardingScreen(vm: AppViewModel) {
             }
         }
         Text(
-            "Aapka data aapke phone par rehta hai. Sirf chat ka text jawab ke liye Google Gemini ko jaata hai. Aap kabhi bhi Settings mein permissions badal sakte ho.",
+            "Aapka data aapke phone par rehta hai. Sirf chat ka text jawab ke liye AI service ko jaata hai. Aap kabhi bhi Settings mein permissions badal sakte ho.",
             style = MaterialTheme.typography.bodySmall
         )
         Button(onClick = { launcher.launch(perms.toTypedArray()) }, modifier = Modifier.fillMaxWidth()) {

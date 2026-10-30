@@ -209,7 +209,7 @@ Escape newlines inside the cmd string as \n so the JSON stays valid.
             val r = gemini.generate(key, model, system, shrink(hist), 0.2f)
             if (!r.ok) {
                 geminiFails++
-                if (geminiFails >= 3) return "Gemini se jawab nahi aaya (" + r.text.take(100) + "). Thodi der baad dobara bolo."
+                if (geminiFails >= 3) return "AI se jawab nahi aaya (" + r.text.take(100) + "). Thodi der baad dobara bolo."
                 delay(2500)
                 continue
             }

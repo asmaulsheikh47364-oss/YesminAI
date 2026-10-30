@@ -67,7 +67,7 @@ When the goal is finished or impossible: {"done_reason":"short","action":"done",
             if (!r.ok) {
                 hist.removeAt(hist.size - 1)
                 fails++
-                if (fails >= 3) return "Gemini se jawab nahi aaya (" + r.text.take(100) + "). Thodi der baad dobara bolo."
+                if (fails >= 3) return "AI se jawab nahi aaya (" + r.text.take(100) + "). Thodi der baad dobara bolo."
                 delay(2500L)
                 continue
             }

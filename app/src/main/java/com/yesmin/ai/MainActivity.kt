@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
@@ -129,7 +131,7 @@ fun YesminRoot() {
                 title = { Text("Privacy notice") },
                 text = {
                     Text(
-                        "Aapke chat/voice ke text messages (aur Tools mein jo text daalo) jawab ke liye internet par Google Gemini ko bheje jaate hain. " +
+                        "Aapke chat/voice ke text messages (aur Tools mein jo text daalo) jawab ke liye internet par AI service ko bheje jaate hain. " +
                             "Phone commands (app kholna, battery, calculator) local hote hain. API key aur memory sirf aapke phone par rehti hai. " +
                             "Memory/history delete karne ke controls Settings mein hain."
                     )
@@ -170,7 +172,8 @@ fun MainScaffold(vm: AppViewModel) {
         topBar = { },
         snackbarHost = { SnackbarHost(snack) },
         bottomBar = {
-            NavigationBar {
+            val imeUp = WindowInsets.ime.getBottom(androidx.compose.ui.platform.LocalDensity.current) > 0
+            if (!imeUp) NavigationBar {
                 tabs.forEach { t ->
                     val selected = route == t.route ||
                         (t.route == "more" && (route in moreRoutes || (route?.startsWith("tool/") == true)))

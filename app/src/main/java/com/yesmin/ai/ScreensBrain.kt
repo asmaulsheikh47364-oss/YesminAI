@@ -58,11 +58,11 @@ fun BrainScreen(vm: AppViewModel) {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text("PAYAL BRAIN", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-        Text("Powered by Gemini. Built for your everyday life.")
+        Text("Built for your everyday life.")
 
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("Active provider: Google Gemini", fontWeight = FontWeight.Bold)
+                Text("Active provider: Payal AI", fontWeight = FontWeight.Bold)
                 val label = "● " + vm.brainStatus.label()
                 val color = when (vm.brainStatus) {
                     BrainStatus.Connected -> Color(0xFF2E7D32)
@@ -79,7 +79,7 @@ fun BrainScreen(vm: AppViewModel) {
 
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Gemini API key", fontWeight = FontWeight.Bold)
+                Text("API key", fontWeight = FontWeight.Bold)
                 OutlinedTextField(
                     value = key, onValueChange = { key = it }, modifier = Modifier.fillMaxWidth(),
                     singleLine = true, label = { Text(if (vm.hasKey) "Nayi key (replace karne ke liye)" else "API key") },
@@ -131,9 +131,9 @@ fun BrainScreen(vm: AppViewModel) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Sample message se test", fontWeight = FontWeight.Bold)
                 OutlinedTextField(value = sample, onValueChange = { sample = it }, modifier = Modifier.fillMaxWidth(), minLines = 2)
-                Button(onClick = { vm.sampleTest(sample) }, enabled = !vm.busy && vm.hasKey) { Text("Gemini ko bhejo") }
+                Button(onClick = { vm.sampleTest(sample) }, enabled = !vm.busy && vm.hasKey) { Text("Payal ko bhejo") }
                 if (vm.sampleReply.isNotBlank()) RichText(vm.sampleReply)
-                Text("Yeh message Google Gemini ko bheja jaata hai.", style = MaterialTheme.typography.bodySmall)
+                Text("Yeh message AI ko bheja jaata hai.", style = MaterialTheme.typography.bodySmall)
             }
         }
 

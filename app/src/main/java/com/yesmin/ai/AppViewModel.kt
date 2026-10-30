@@ -19,7 +19,7 @@ import kotlinx.coroutines.launch
 
 enum class VoiceState { Idle, Connecting, Listening, Processing, Speaking, Paused, Error }
 enum class BrainStatus { NotConnected, Connecting, Connected, InvalidKey, QuotaExceeded, RateLimited, NetworkError, ServiceUnavailable, Error }
-data class ChatMsg(val fromUser: Boolean, val text: String, val error: Boolean = false)
+data class ChatMsg(val fromUser: Boolean, val text: String, val error: Boolean = false, val voice: Boolean = false, val imagePath: String? = null)
 data class Pending(val description: String, val action: A11yAction)
 data class PendingReply(val msg: IncomingMessage, val text: String)
 data class ActionLog(val time: Long, val text: String, val undo: (() -> Unit)? = null)
@@ -196,11 +196,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     if (r.ok && r.audio != null) { audio = r.audio; break }
                 }
                 if (audio != null) {
-                    voiceSource = "Gemini voice"
+                    voiceSource = "Payal voice"
                     voiceState = VoiceState.Speaking
                     pcm.play(audio) { afterTurn() }
                 } else {
-                    notice = "Gemini awaaz nahi mili — phone ki awaaz se bol rahi hoon."
+                    notice = "Payal ki awaaz nahi mili — phone ki awaaz se bol rahi hoon."
                     phoneSpeak(text, p.pitch, p.rate)
                 }
             }
@@ -518,8 +518,8 @@ fun runTermuxCommand(command: String) {
 
     private fun gateGemini(): String? {
         val wait = (blockedUntil - System.currentTimeMillis()) / 1000
-        if (wait > 0) return "Gemini ki limit ki wajah se abhi ruko: " + (wait + 1) + " second."
-        if (prefs.apiKey == null) return "Pehle AI Brain screen mein Gemini API key daalo."
+        if (wait > 0) return "AI ki limit ki wajah se abhi ruko: " + (wait + 1) + " second."
+        if (prefs.apiKey == null) return "Pehle AI Brain screen mein API key daalo."
         if (!disclosure) return "Pehle Privacy notice accept karo (app dobara kholo ya Settings → Privacy). Local commands tab bhi chalte hain."
         return null
     }
@@ -529,16 +529,41 @@ fun runTermuxCommand(command: String) {
         val key = prefs.apiKey ?: return
         busy = true
         voiceState = VoiceState.Processing
-        val hist = messages.filter { !it.error }.takeLast(12)
+        val hist = messages.filter { !it.error && it.text.isNotBlank() }.takeLast(12)
             .map { (if (it.fromUser) "user" else "model") to it.text }
             .dropWhile { it.first != "user" }
         val mem = if (memoryEnabled && !tempMode) memories.filter { it.category != "snippet" }.take(30).map { it.text } else emptyList()
         viewModelScope.launch {
-            val r = gemini.generate(key, model, Personas.chatSystem(persona, language, mem, activeProfile().name, activeProfile().tone), hist, temperature)
+            val r = gemini.generate(key, model, Personas.chatSystem(persona, language, mem, activeProfile().name, activeProfile().tone) + StyleGuide.TEXT, hist, temperature)
             busy = false
             noteResult(r)
-            if (r.ok) { reply(r.text.replace(Regex("(?s)```.*?```"), "").trim(), speak); autoRemember() } else reply(r.text, false, true)
+            if (r.ok && handleImageReply(r.text, speak)) { autoRemember() } else if (r.ok) { reply(r.text.replace(Regex("(?s)```.*?```"), "").trim(), speak); autoRemember() } else reply(r.text, false, true)
         }
+    }
+
+    /** When the chat model answers with [[IMAGE: ...]] the picture is generated and shown in the chat. */
+    private fun handleImageReply(text: String, speak: Boolean): Boolean {
+        val s = text.indexOf("[[IMAGE:")
+        if (s < 0) return false
+        val e = text.indexOf("]]", s)
+        if (e < 0) return false
+        val prompt = text.substring(s + 8, e).trim()
+        val caption = (text.substring(0, s) + text.substring(e + 2)).trim()
+        val key = prefs.apiKey ?: return false
+        if (prompt.isEmpty()) return false
+        busy = true
+        viewModelScope.launch {
+            val r = gemini.generateImage(key, prompt)
+            busy = false
+            val img = r.image
+            if (r.ok && img != null) {
+                messages.add(ChatMsg(false, caption, imagePath = ImageStore.saveCache(ctx, img)))
+                if (speak && caption.isNotBlank()) speakWith(caption) else afterTurn()
+            } else {
+                reply(r.text, false, true)
+            }
+        }
+        return true
     }
 
     fun speakText(text: String) { speakWith(text) }
@@ -553,7 +578,7 @@ fun runTermuxCommand(command: String) {
     fun startUiAgent(goalText: String): String {
         val goal = goalText.trim()
         if (goal.isEmpty()) return "Goal batao: phone par kya karna hai?"
-        val key = prefs.apiKey ?: return "Gemini key nahi hai."
+        val key = prefs.apiKey ?: return "API key nahi hai."
         if (uiJob?.isActive == true) return "Ek screen ka kaam abhi chal raha hai."
         if (!YesminAccessibilityService.isRunning()) return "Accessibility chalu nahi hai. Settings mein Payal ko ek baar OFF karke phir ON karna hoga."
         uiJob = viewModelScope.launch(kotlinx.coroutines.Dispatchers.Default) {
@@ -571,7 +596,7 @@ fun runTermuxCommand(command: String) {
     fun startAgent(goalText: String): String {
         val goal = goalText.trim()
         if (goal.isEmpty()) return "Goal batao: kya banana ya karna hai?"
-        val key = prefs.apiKey ?: return "Gemini key nahi hai."
+        val key = prefs.apiKey ?: return "API key nahi hai."
         if (agentJob?.isActive == true) return "Ek kaam abhi chal raha hai: " + agentStatus
         if (!TermuxBridge.ready(ctx)) return TermuxBridge.setupHelp(ctx)
         agentStatus = "Shuru: " + goal.take(80)
@@ -874,8 +899,8 @@ fun runTermuxCommand(command: String) {
             val lv = LiveVoice(
                 context = ctx,
                 onState = { if (sessionActive && !sessionPaused) { voiceState = it; if (it == VoiceState.Listening) liveFails = 0 } },
-                onUserText = { liveLog.add(ChatMsg(true, it)); messages.add(ChatMsg(true, it)); if (liveLog.size > 200) liveLog.removeAt(0) },
-                onModelText = { liveLog.add(ChatMsg(false, it)); messages.add(ChatMsg(false, it)); if (liveLog.size > 200) liveLog.removeAt(0); autoRemember() },
+                onUserText = { liveLog.add(ChatMsg(true, it)); messages.add(ChatMsg(true, it, voice = true)); if (liveLog.size > 200) liveLog.removeAt(0) },
+                onModelText = { liveLog.add(ChatMsg(false, it)); messages.add(ChatMsg(false, it, voice = true)); if (liveLog.size > 200) liveLog.removeAt(0); autoRemember() },
                 onLevel = { micLevel = it },
                 onTool = { c, ok -> liveCommand(c, ok) },
                 onCommand = { c -> if (c == "stop") { try { StandbyService.start(ctx) } catch (e: Exception) {}; stopSession() } else { live?.quiet = true; voiceState = VoiceState.Listening } },
@@ -899,7 +924,7 @@ fun runTermuxCommand(command: String) {
                 }
             )
             live = lv
-            voiceSource = "Gemini Live"
+            voiceSource = "Payal Live"
             lv.skipGreeting = liveResumed
             lv.onNoAudio = { t -> if (sessionActive && !sessionPaused && !micMuted) phoneSpeak(t, p.pitch, p.rate) }
             lv.start(key, m, system, p.geminiVoice)
@@ -1013,7 +1038,7 @@ fun runTermuxCommand(command: String) {
         val t = gemini.generate(key, model, "Reply with the single word OK.", listOf("user" to "ping"), 0f)
         if (t.ok) {
             brainStatus = BrainStatus.Connected
-            brainMessage = "Gemini ($model) se asli jawab mila — Connected."
+            brainMessage = "AI ($model) se asli jawab mila — Connected."
         } else {
             noteResult(t)
             brainMessage = t.text
@@ -1129,7 +1154,7 @@ fun runTermuxCommand(command: String) {
     }
 
     suspend fun describeFrame(jpeg: ByteArray): String {
-        val key = prefs.apiKey ?: return "Pehle Gemini key daalo."
+        val key = prefs.apiKey ?: return "Pehle API key daalo."
         toolBusy = true
         val r = gemini.generateVision(key, model, Personas.toolSystem(VisionPrompts.CAMERA, language), "Yeh abhi camera mein kya hai? Batao aur samjhao.", jpeg)
         toolBusy = false
@@ -1140,7 +1165,7 @@ fun runTermuxCommand(command: String) {
         val q = question.ifBlank { VisionPrompts.Q }
         messages.add(ChatMsg(true, "📷 Photo bheji"))
         val key = prefs.apiKey
-        if (key == null) { reply("Pehle AI Brain mein Gemini key daalo.", false, true); return }
+        if (key == null) { reply("Pehle AI Brain mein API key daalo.", false, true); return }
         busy = true
         viewModelScope.launch {
             val r = gemini.generateVision(key, model, Personas.toolSystem(VisionPrompts.READ, language), q, jpeg)
@@ -1152,7 +1177,7 @@ fun runTermuxCommand(command: String) {
     fun sendFileToChat(name: String, text: String) {
         messages.add(ChatMsg(true, "📁 File bheji: " + name))
         val key = prefs.apiKey
-        if (key == null) { reply("Pehle AI Brain mein Gemini key daalo.", false, true); return }
+        if (key == null) { reply("Pehle AI Brain mein API key daalo.", false, true); return }
         busy = true
         viewModelScope.launch {
             val r = gemini.generate(key, model, Personas.toolSystem("User ne ek file ka content bheja hai. Ise samajh kar madad karo.", language), listOf("user" to text.take(8000)), temperature)

@@ -344,7 +344,7 @@ fun SupportScreen(vm: AppViewModel) {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                NeonAvatar(76.dp, "A")
+                CreatorPhoto(132.dp)
                 Text("CREATOR", color = NeonCyan, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 3.sp)
                 Text("Md Asmaul", color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.Bold)
                 Text("Founder & Developer, Payal", color = Color(0xFFB8C0E0), fontSize = 14.sp)

@@ -94,10 +94,10 @@ fun VisionScreen(vm: AppViewModel) {
         }
         OutlinedTextField(value = question, onValueChange = { question = it }, label = { Text("Kya poochna hai?") }, minLines = 2, modifier = Modifier.fillMaxWidth())
         Button(onClick = { jpeg?.let { vm.askVision(it, question) } }, enabled = jpeg != null && !vm.toolBusy) {
-            Text("Gemini se poochho")
+            Text("Payal se poochho")
         }
         if (vm.toolBusy) CircularProgressIndicator()
         if (vm.visionOutput.isNotBlank()) RichText(vm.visionOutput)
-        Text("Chuni hui photo Google Gemini ko bheji jaati hai. Kuch phone par save nahi hota.", style = MaterialTheme.typography.bodySmall)
+        Text("Chuni hui photo AI ko bheji jaati hai. Kuch phone par save nahi hota.", style = MaterialTheme.typography.bodySmall)
     }
 }

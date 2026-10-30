@@ -61,21 +61,21 @@ val AI_TOOLS = listOf(
         "Ek simple Android login screen banao", "Coding Assistant"),
     AiTool("translate", "Hindi ⇄ English Translate", "Translation",
         "Translate between Hindi and English. If the input is Hindi, translate to English. If English, translate to Hindi (Devanagari) and also give a Hinglish (Roman) version.",
-        "Jo translate karna hai woh likho", "Gemini Tools"),
+        "Jo translate karna hai woh likho", "Payal Tools"),
     AiTool("write", "Writing & Message Draft", "Email/message/letter draft",
         "Write the requested message or text. Ask nothing; make reasonable assumptions and keep the tone appropriate.",
-        "Boss ko leave ke liye email likho", "Gemini Tools"),
+        "Boss ko leave ke liye email likho", "Payal Tools"),
     AiTool("summary", "Summary", "Text ka summary",
-        "Summarize the given text in a few clear bullet points, then give a one-line takeaway.", "Text paste karo", "Gemini Tools"),
+        "Summarize the given text in a few clear bullet points, then give a one-line takeaway.", "Text paste karo", "Payal Tools"),
     AiTool("study", "Study & Quiz", "Samjhao + quiz banao",
-        "Explain the topic simply with an example, then create a 5-question quiz with answers at the end.", "Topic likho (jaise: photosynthesis)", "Gemini Tools"),
+        "Explain the topic simply with an example, then create a 5-question quiz with answers at the end.", "Topic likho (jaise: photosynthesis)", "Payal Tools"),
     AiTool("ideas", "Ideas & Captions", "Creative ideas, captions",
-        "Give 8 creative ideas or captions for the request.", "Kis cheez ke liye ideas chahiye?", "Gemini Tools"),
+        "Give 8 creative ideas or captions for the request.", "Kis cheez ke liye ideas chahiye?", "Payal Tools"),
     AiTool("analyze", "Text/Document Analysis", "Paste kiye text ka basic analysis",
-        "Analyze the pasted text: main topic, key points, tone, possible issues, and suggested improvements.", "Text paste karo", "Gemini Tools"),
+        "Analyze the pasted text: main topic, key points, tone, possible issues, and suggested improvements.", "Text paste karo", "Payal Tools"),
     AiTool("trouble", "Troubleshooting", "Phone/app/tech problem ka guidance",
         "Give step-by-step troubleshooting guidance for the described problem, ordered from the simplest fix to the most involved.",
-        "Problem likho (jaise: Wi-Fi connect nahi ho raha)", "Gemini Tools")
+        "Problem likho (jaise: Wi-Fi connect nahi ho raha)", "Payal Tools")
 )
 
 @Composable
@@ -115,14 +115,14 @@ fun ToolsScreen(vm: AppViewModel, nav: NavHostController) {
             }
         }
 
-        listOf("Coding Assistant", "Gemini Tools").forEach { g ->
-            Text(g + " (Gemini se, internet + key chahiye)", style = MaterialTheme.typography.titleMedium)
+        listOf("Coding Assistant", "Payal Tools").forEach { g ->
+            Text(g + " (Payal se, internet + key chahiye)", style = MaterialTheme.typography.titleMedium)
             AI_TOOLS.filter { it.group == g }.forEach { t ->
-                ToolCard(t.title, t.desc, "Gemini") { nav.navigate("tool/${t.id}") }
+                ToolCard(t.title, t.desc, "AI") { nav.navigate("tool/${t.id}") }
             }
         }
 
-        ToolCard("Photo AI", "Photo dikhao, sawaal poochho (Gemini Vision)", "Gemini") { nav.navigate("vision") }
+        ToolCard("Photo AI", "Photo dikhao, sawaal poochho (Photo AI)", "AI") { nav.navigate("vision") }
 
         Text("Abhi available nahi", style = MaterialTheme.typography.titleMedium)
         Card(Modifier.fillMaxWidth()) {
@@ -150,8 +150,8 @@ fun ToolScreen(vm: AppViewModel, id: String) {
             value = input, onValueChange = { input = it }, modifier = Modifier.fillMaxWidth(),
             minLines = 5, placeholder = { Text(tool.hint) }
         )
-        Button(onClick = { vm.runTool(tool.instr, input) }, enabled = !vm.toolBusy) { Text("Gemini se chalao") }
-        Text("Text Google Gemini ko bheja jaata hai. Generated code compile/test nahi hua hota — khud check karo.", style = MaterialTheme.typography.bodySmall)
+        Button(onClick = { vm.runTool(tool.instr, input) }, enabled = !vm.toolBusy) { Text("Payal se chalao") }
+        Text("Text AI ko bheja jaata hai. Generated code compile/test nahi hua hota — khud check karo.", style = MaterialTheme.typography.bodySmall)
         if (vm.toolBusy) CircularProgressIndicator()
         if (vm.toolOutput.isNotBlank()) {
             RichText(vm.toolOutput, onSave = { vm.addMemory("snippet", it) })

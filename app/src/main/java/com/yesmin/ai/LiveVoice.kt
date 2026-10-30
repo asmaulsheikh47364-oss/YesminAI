@@ -136,12 +136,12 @@ class LiveVoice(
     private fun closeText(code: Int, reason: String): String {
         val r = reason.lowercase()
         return if (r.contains("quota") || r.contains("exhaust") || r.contains("limit") || r.contains("429"))
-            "Gemini ki limit khatam ho gayi hai, thodi der baad try karo. [" + code + " " + reason.take(160) + "]"
+            "AI ki limit khatam ho gayi hai, thodi der baad try karo. [" + code + " " + reason.take(160) + "]"
         else "Live connection band ho gaya ($code). " + reason.take(100)
     }
 
     private fun failText(code: Int?): String = when (code) {
-        429 -> "Gemini ki limit khatam ho gayi hai, thodi der baad try karo."
+        429 -> "AI ki limit khatam ho gayi hai, thodi der baad try karo."
         400, 401, 403 -> "API key ya Live model ki permission mein dikkat hai (code $code)."
         else -> "Internet ya Live connection mein dikkat hai."
     }

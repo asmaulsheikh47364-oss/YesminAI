@@ -40,6 +40,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
@@ -97,17 +98,78 @@ fun RichText(text: String, onSave: ((String) -> Unit)? = null) {
     }
 }
 
-fun boldSpan(s: String): AnnotatedString = buildAnnotatedString {
-    val re = Regex("\\*\\*(.+?)\\*\\*")
-    var last = 0
-    for (m in re.findAll(s)) {
-        append(s.substring(last, m.range.first))
-        withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(m.groupValues[1]) }
-        last = m.range.last + 1
+private fun styleFor(spec: String): SpanStyle {
+    var color = Color.Unspecified
+    var fam: FontFamily? = null
+    var weight: FontWeight? = null
+    var ital: androidx.compose.ui.text.font.FontStyle? = null
+    var deco: androidx.compose.ui.text.style.TextDecoration? = null
+    var size = androidx.compose.ui.unit.TextUnit.Unspecified
+    var glow = false
+    for (raw in spec.split(",")) {
+        when (raw.trim().lowercase()) {
+            "serif" -> fam = FontFamily.Serif
+            "sans" -> fam = FontFamily.SansSerif
+            "mono" -> fam = FontFamily.Monospace
+            "cursive" -> fam = FontFamily.Cursive
+            "bold" -> weight = FontWeight.Bold
+            "italic" -> ital = androidx.compose.ui.text.font.FontStyle.Italic
+            "underline" -> deco = androidx.compose.ui.text.style.TextDecoration.Underline
+            "strike" -> deco = androidx.compose.ui.text.style.TextDecoration.LineThrough
+            "big" -> size = 22.sp
+            "huge" -> size = 30.sp
+            "small" -> size = 12.sp
+            "glow" -> glow = true
+            "red" -> color = Color(0xFFEF4444)
+            "green" -> color = Color(0xFF22C55E)
+            "blue" -> color = Color(0xFF3B82F6)
+            "gold" -> color = Color(0xFFFBBF24)
+            "pink" -> color = Color(0xFFF472B6)
+            "purple" -> color = Color(0xFFA78BFA)
+            "cyan" -> color = Color(0xFF22D3EE)
+            "orange" -> color = Color(0xFFFB923C)
+        }
     }
-    append(s.substring(last))
+    val sh = if (glow) androidx.compose.ui.graphics.Shadow(
+        if (color == Color.Unspecified) Color.White else color,
+        androidx.compose.ui.geometry.Offset.Zero, 18f
+    ) else null
+    return SpanStyle(color = color, fontSize = size, fontWeight = weight, fontStyle = ital, fontFamily = fam, textDecoration = deco, shadow = sh)
 }
 
+private fun AnnotatedString.Builder.appendBold(s: String) {
+    var i = 0
+    while (i < s.length) {
+        val a = s.indexOf("**", i)
+        val b = if (a >= 0) s.indexOf("**", a + 2) else -1
+        if (a < 0 || b < 0 || b == a + 2) {
+            append(s.substring(i))
+            return
+        }
+        append(s.substring(i, a))
+        withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(s.substring(a + 2, b)) }
+        i = b + 2
+    }
+}
+
+private fun AnnotatedString.Builder.appendRich(s: String) {
+    var i = 0
+    while (i < s.length) {
+        val a = s.indexOf("{{", i)
+        val b = if (a >= 0) s.indexOf("}}", a + 2) else -1
+        val bar = if (b > 0) s.indexOf('|', a + 2) else -1
+        if (a < 0 || b < 0 || bar < 0 || bar > b) {
+            appendBold(s.substring(i))
+            return
+        }
+        appendBold(s.substring(i, a))
+        withStyle(styleFor(s.substring(a + 2, bar))) { appendBold(s.substring(bar + 1, b)) }
+        i = b + 2
+    }
+}
+
+/** Bold with **stars** and styled text with {{font,colour,size|text}}. */
+fun boldSpan(s: String): AnnotatedString = buildAnnotatedString { appendRich(s) }
 @Composable
 fun MarkdownText(text: String) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -149,8 +211,44 @@ fun CodeBlock(raw: String, onSave: ((String) -> Unit)?) {
 }
 
 @Composable
+fun GeneratedImage(path: String) {
+    val ctx = LocalContext.current
+    val bmp = remember(path) { try { android.graphics.BitmapFactory.decodeFile(path)?.asImageBitmap() } catch (e: Exception) { null } }
+    var tools by remember { mutableStateOf(false) }
+    var menu by remember { mutableStateOf(false) }
+    if (bmp == null) {
+        Text("Photo khul nahi payi", color = MaterialTheme.colorScheme.error)
+        return
+    }
+    val ink = MaterialTheme.colorScheme.onSurface
+    Box(Modifier.padding(top = 8.dp).widthIn(max = 340.dp).clip(RoundedCornerShape(18.dp)).clickable { tools = !tools }) {
+        androidx.compose.foundation.Image(
+            bitmap = bmp, contentDescription = null,
+            contentScale = androidx.compose.ui.layout.ContentScale.FillWidth,
+            modifier = Modifier.fillMaxWidth()
+        )
+        if (tools) {
+            Box(Modifier.align(Alignment.TopEnd).padding(8.dp)) {
+                RoundIconButton(PI.More, Color(0xB3000000), Color.White, { menu = true }, 38.dp, 20.dp)
+                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    DropdownMenuItem(
+                        text = { Text("Download") }, leadingIcon = { PIcon(PI.Download, ink) },
+                        onClick = { menu = false; tools = false; ImageStore.download(ctx, path) }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Share") }, leadingIcon = { PIcon(PI.Share, ink) },
+                        onClick = { menu = false; tools = false; ImageStore.share(ctx, path) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun Bubble(m: ChatMsg, vm: AppViewModel) {
     val clipboard = LocalClipboardManager.current
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant
     if (m.fromUser) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             Surface(
@@ -164,18 +262,19 @@ fun Bubble(m: ChatMsg, vm: AppViewModel) {
     } else {
         Column(Modifier.fillMaxWidth().padding(end = 6.dp)) {
             Text("✦ Payal", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.labelLarge)
-            Column(Modifier.padding(top = 6.dp)) {
-                if (m.error) Text(m.text, color = MaterialTheme.colorScheme.error) else RichText(m.text, onSave = { vm.addMemory("snippet", it) })
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                TextButton(onClick = { clipboard.setText(AnnotatedString(m.text)) }) { Text("⧉", color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                if (!m.error) TextButton(onClick = { vm.speakText(m.text) }) { Text("🔊", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            if (m.imagePath != null) GeneratedImage(m.imagePath)
+            if (m.text.isNotBlank()) {
+                Column(Modifier.padding(top = 6.dp)) {
+                    if (m.error) Text(m.text, color = MaterialTheme.colorScheme.error) else RichText(m.text, onSave = { vm.addMemory("snippet", it) })
+                }
+                Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    RoundIconButton(PI.Copy, Color.Transparent, muted, { clipboard.setText(AnnotatedString(m.text)) }, 34.dp, 18.dp)
+                    if (!m.error) RoundIconButton(PI.Speaker, Color.Transparent, muted, { vm.speakText(m.text) }, 34.dp, 18.dp)
+                }
             }
         }
     }
 }
-
-
 // ---------- Home ----------
 
 @Composable
@@ -224,8 +323,9 @@ fun ChatScreen(vm: AppViewModel) {
         if (bmp != null) vm.sendImageToChat(ImageUtil.toJpeg(bmp), VisionPrompts.Q)
     }
     val listState = rememberLazyListState()
-    LaunchedEffect(vm.messages.size) {
-        if (vm.messages.isNotEmpty()) listState.animateScrollToItem(vm.messages.size - 1)
+    val shown = vm.messages.filter { !it.voice }
+    LaunchedEffect(shown.size) {
+        if (shown.isNotEmpty()) listState.animateScrollToItem(shown.size - 1)
     }
     val micLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) vm.startListening() else vm.voiceDenied()
@@ -244,7 +344,7 @@ fun ChatScreen(vm: AppViewModel) {
         }
     }
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
-    Column(Modifier.fillMaxSize().imePadding().navigationBarsPadding()) {
+    Column(Modifier.fillMaxSize().imePadding()) {
         Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(
                 if (vm.tempMode) "Temporary chat" else "",
@@ -265,13 +365,13 @@ fun ChatScreen(vm: AppViewModel) {
                             onClick = { vm.changePersona(n); showMenu = false }
                         )
                     }
-                    if (vm.messages.isNotEmpty()) {
+                    if (shown.isNotEmpty()) {
                         DropdownMenuItem(text = { Text("Nayi chat (clear)") }, onClick = { vm.clearChat(); showMenu = false })
                     }
                 }
             }
         }
-        if (vm.messages.isEmpty()) {
+        if (shown.isEmpty()) {
             Column(
                 Modifier.weight(1f).fillMaxWidth().padding(horizontal = 28.dp),
                 verticalArrangement = Arrangement.Center,
@@ -286,7 +386,7 @@ fun ChatScreen(vm: AppViewModel) {
                 )
                 if (!vm.hasKey) {
                     Text(
-                        "AI jawab ke liye AI Brain tab mein Gemini key daalo.",
+                        "AI jawab ke liye AI Brain tab mein API key daalo.",
                         style = MaterialTheme.typography.bodySmall, color = muted,
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                         modifier = Modifier.padding(top = 14.dp)
@@ -300,9 +400,9 @@ fun ChatScreen(vm: AppViewModel) {
                 verticalArrangement = Arrangement.spacedBy(20.dp),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
             ) {
-                items(vm.messages.size) { i -> Bubble(vm.messages[i], vm) }
+                items(shown.size) { i -> Bubble(shown[i], vm) }
                 if (vm.busy) {
-                    item { Text("✦ Payal likh rahi hai…", style = MaterialTheme.typography.bodySmall, color = muted) }
+                    item { Text("✦ Payal kaam kar rahi hai…", style = MaterialTheme.typography.bodySmall, color = muted) }
                 }
             }
         }
@@ -351,10 +451,7 @@ fun ChatScreen(vm: AppViewModel) {
                 )
                 Row(Modifier.fillMaxWidth().padding(start = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Box {
-                        Box(
-                            Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surface).clickable { showAttach = !showAttach },
-                            contentAlignment = Alignment.Center
-                        ) { Text("+", fontSize = 22.sp, color = muted) }
+                        RoundIconButton(PI.Plus, MaterialTheme.colorScheme.surface, MaterialTheme.colorScheme.onSurface, { showAttach = !showAttach }, 42.dp, 22.dp)
                         DropdownMenu(expanded = showAttach, onDismissRequest = { showAttach = false }) {
                             DropdownMenuItem(text = { Text("File bhejo") }, onClick = { showAttach = false; fileLauncher.launch(arrayOf("*/*")) })
                             DropdownMenuItem(text = { Text("Gallery se photo") }, onClick = { showAttach = false; imageLauncher.launch("image/*") })
@@ -362,16 +459,21 @@ fun ChatScreen(vm: AppViewModel) {
                         }
                     }
                     Box(Modifier.weight(1f))
-                    Box(
-                        Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surface).clickable { onMic() },
-                        contentAlignment = Alignment.Center
-                    ) { Text(if (vm.voiceState == VoiceState.Listening) "⏹" else "🎙", fontSize = 17.sp) }
-                    Box(
-                        Modifier.padding(start = 8.dp).size(40.dp).clip(CircleShape)
-                            .background(if (input.isBlank()) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.primary)
-                            .clickable { doSend() },
-                        contentAlignment = Alignment.Center
-                    ) { Text("↑", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary) }
+                    val listening = vm.voiceState == VoiceState.Listening
+                    RoundIconButton(
+                        if (listening) PI.Stop else PI.Mic,
+                        if (listening) Color(0xFFE5484D) else MaterialTheme.colorScheme.surface,
+                        if (listening) Color.White else MaterialTheme.colorScheme.onSurface,
+                        { onMic() }, 42.dp, 22.dp
+                    )
+                    Box(Modifier.padding(start = 8.dp)) {
+                        RoundIconButton(
+                            PI.Up,
+                            if (input.isBlank()) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.primary,
+                            if (input.isBlank()) muted else MaterialTheme.colorScheme.onPrimary,
+                            { doSend() }, 42.dp, 22.dp
+                        )
+                    }
                 }
             }
         }
