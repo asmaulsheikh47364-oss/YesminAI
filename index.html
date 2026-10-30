@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yesmin AI - Your Intelligent Android Assistant powered by Gemini</title>
+    <meta name="description" content="Yesmin AI is a powerful, modern Android application powered by Google Gemini, offering smart conversations, code assistance, creative writing, and voice integration.">
+    <meta name="keywords" content="Yesmin AI, Gemini Android App, AI Assistant, Jetpack Compose AI, Kotlin AI App">
+    <link rel="canonical" href="https://asmaulsheikh47364-oss.github.io/YesminAI/">
+    
+    <!-- Open Graph Tags -->
+    <meta property="og:title" content="Yesmin AI - Intelligent Android Assistant">
+    <meta property="og:description" content="Meet Yesmin AI, the advanced Android app built with Kotlin, Jetpack Compose, and Google Gemini API.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://asmaulsheikh47364-oss.github.io/YesminAI/">
+    
+    <style>
+        :root {
+            --primary: #6200ee;
+            --primary-variant: #3700b3;
+            --secondary: #03dac6;
+            --background: #121212;
+            --surface: #1e1e1e;
+            --text: #ffffff;
+            --text-secondary: #b0b0b0;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--background);
+            color: var(--text);
+            line-height: 1.6;
+        }
+        header {
+            background: linear-gradient(135deg, var(--primary), var(--primary-variant));
+            padding: 4rem 2rem;
+            text-align: center;
+        }
+        header h1 {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            background: linear-gradient(to right, #ffffff, var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        header p {
+            font-size: 1.25rem;
+            color: var(--text-secondary);
+            max-width: 600px;
+            margin: 0 auto 2rem auto;
+        }
+        .btn {
+            display: inline-block;
+            background-color: var(--secondary);
+            color: #000000;
+            padding: 0.75rem 2rem;
+            font-weight: bold;
+            border-radius: 30px;
+            text-decoration: none;
+            transition: transform 0.2s, background-color 0.2s;
+            box-shadow: 0 4px 14px rgba(3, 218, 198, 0.4);
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            background-color: #01b8a6;
+        }
+        main {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 4rem 2rem;
+        }
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+            margin-bottom: 4rem;
+        }
+        .card {
+            background-color: var(--surface);
+            padding: 2rem;
+            border-radius: 12px;
+            border: 1px solid #333;
+            transition: border-color 0.2s;
+        }
+        .card:hover {
+            border-color: var(--secondary);
+        }
+        .card h3 {
+            color: var(--secondary);
+            margin-bottom: 1rem;
+            font-size: 1.5rem;
+        }
+        .card p {
+            color: var(--text-secondary);
+        }
+        footer {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-secondary);
+            border-top: 1px solid #222;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Yesmin AI</h1>
+        <p>Your intelligent, responsive Android assistant powered by state-of-the-art Google Gemini models.</p>
+        <a href="#download" class="btn">Get the App</a>
+    </header>
+    <main>
+        <section class="features">
+            <div class="card">
+                <h3>⚡ Powered by Gemini</h3>
+                <p>Leverages Google's cutting-edge Gemini API for lightning-fast, highly accurate, and contextual responses.</p>
+            </div>
+            <div class="card">
+                <h3>🎨 Jetpack Compose</h3>
+                <p>Built completely with modern Android UI toolkit, offering a fluid, sleek, and dynamic dark-themed interface.</p>
+            </div>
+            <div class="card">
+                <h3>🔒 Secure & Private</h3>
+                <p>Your api keys and chat history are safely handled locally on your device with robust state management.</p>
+            </div>
+        </section>
+        
+        <section id="download" style="text-align: center; background: var(--surface); padding: 3rem; border-radius: 12px; border: 1px solid #333;">
+            <h2 style="margin-bottom: 1rem; color: var(--secondary); font-size: 2rem;">Download Yesmin AI APK</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 2rem;">Get the latest debug build directly from GitHub Actions.</p>
+            <a href="https://github.com/asmaulsheikh47364-oss/YesminAI/actions" class="btn" target="_blank" rel="noopener">View Releases & Builds</a>
+        </section>
+    </main>
+    <footer>
+        <p>&copy; 2026 Yesmin AI. Built with passion using Kotlin and Gemini.</p>
+    </footer>
+</body>
+</html>
