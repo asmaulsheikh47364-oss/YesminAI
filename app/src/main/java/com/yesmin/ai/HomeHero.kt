@@ -91,7 +91,7 @@ fun HomeHero(vm: AppViewModel, greeting: String, onMic: () -> Unit) {
         initialValue = 0f, targetValue = 360f,
         animationSpec = infiniteRepeatable(tween(18000, easing = LinearEasing), RepeatMode.Restart), label = "spin"
     )
-    val blink = remember { androidx.compose.animation.core.Animatable(0f) }
+    val blink = androidx.compose.runtime.remember { androidx.compose.animation.core.Animatable(0f) }
     androidx.compose.runtime.LaunchedEffect(Unit) {
         while (true) {
             kotlinx.coroutines.delay(2000L + (Math.random() * 3500).toLong())
