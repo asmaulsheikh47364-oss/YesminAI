@@ -62,7 +62,7 @@ fun OnboardingScreen(vm: AppViewModel) {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         NeonAvatar(120.dp)
-        Text("Yesmin AI", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        Text("Payal", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         Text("Aapki personal AI companion — smart, friendly, hamesha saath.")
         OutlinedTextField(
             value = name, onValueChange = { name = it }, singleLine = true,

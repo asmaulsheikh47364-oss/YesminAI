@@ -33,7 +33,7 @@ object ReminderScheduler {
     fun createChannel(ctx: Context) {
         if (Build.VERSION.SDK_INT >= 26) {
             val ch = NotificationChannel(CHANNEL, "Reminders", NotificationManager.IMPORTANCE_HIGH)
-            ch.description = "Yesmin AI reminders"
+            ch.description = "Payal reminders"
             ctx.getSystemService(NotificationManager::class.java).createNotificationChannel(ch)
         }
     }
@@ -102,11 +102,11 @@ object ReminderScheduler {
         )
         val pub = NotificationCompat.Builder(ctx, CHANNEL)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-            .setContentTitle("Yesmin AI reminder")
+            .setContentTitle("Payal reminder")
             .build()
         val n = NotificationCompat.Builder(ctx, CHANNEL)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-            .setContentTitle(if (hide) "Yesmin AI reminder" else r.title)
+            .setContentTitle(if (hide) "Payal reminder" else r.title)
             .setContentText(if (hide) "Ek reminder aaya hai" else r.note.ifBlank { "Reminder" })
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_REMINDER)

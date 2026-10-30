@@ -127,7 +127,7 @@ fun ToolsScreen(vm: AppViewModel, nav: NavHostController) {
         Text("Abhi available nahi", style = MaterialTheme.typography.titleMedium)
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(14.dp)) {
-                Text("\"Hey Yesmin\" bolkar jagana abhi nahi hai (battery aur Android ki pabandiyon ki wajah se). Mic button dabakar baat karo.", style = MaterialTheme.typography.bodySmall)
+                Text("\"Hey Payal\" bolkar jagana abhi nahi hai (battery aur Android ki pabandiyon ki wajah se). Mic button dabakar baat karo.", style = MaterialTheme.typography.bodySmall)
             }
         }
     }

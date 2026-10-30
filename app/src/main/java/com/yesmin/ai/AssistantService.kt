@@ -165,7 +165,7 @@ class YesminTile : TileService() {
         val t = qsTile ?: return
         val vm = (application as YesminApp).vm
         t.state = if (vm.sessionActive) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
-        t.label = "Yesmin AI"
+        t.label = "Payal"
         t.updateTile()
     }
 }

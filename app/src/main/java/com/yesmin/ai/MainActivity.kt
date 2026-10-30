@@ -5,6 +5,10 @@ package com.yesmin.ai
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import android.content.Intent
 import android.os.Bundle
@@ -88,7 +92,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private data class Tab(val route: String, val label: String, val icon: String)
+private data class Tab(val route: String, val label: String, val icon: String, val color: androidx.compose.ui.graphics.Color, val shape: androidx.compose.ui.graphics.Shape)
 
 /** Switch between the five bottom-bar tabs. */
 fun navTab(nav: NavHostController, route: String) {
@@ -155,22 +159,15 @@ fun MainScaffold(vm: AppViewModel) {
         }
     }
     val tabs = listOf(
-        Tab("home", "Home", "🏠"), Tab("chat", "Chat", "💬"), Tab("camera", "Camera", "📷"), Tab("brain", "AI Brain", "🧠"), Tab("more", "More", "☰")
+        Tab("home", "Home", "🏠", androidx.compose.ui.graphics.Color(0xFF22D3EE), androidx.compose.foundation.shape.CircleShape),
+        Tab("chat", "Chat", "💬", androidx.compose.ui.graphics.Color(0xFF8B5CF6), androidx.compose.foundation.shape.RoundedCornerShape(10.dp)),
+        Tab("camera", "Camera", "📷", androidx.compose.ui.graphics.Color(0xFFF472B6), androidx.compose.foundation.shape.CutCornerShape(9.dp)),
+        Tab("brain", "AI Brain", "🧠", androidx.compose.ui.graphics.Color(0xFFF59E0B), androidx.compose.foundation.shape.RoundedCornerShape(topStart = 14.dp, topEnd = 4.dp, bottomEnd = 14.dp, bottomStart = 4.dp)),
+        Tab("more", "More", "☰", androidx.compose.ui.graphics.Color(0xFF34D399), androidx.compose.foundation.shape.RoundedCornerShape(percent = 32))
     )
     val moreRoutes = setOf("more", "apps", "calc", "support", "vision")
     Scaffold(
-        topBar = {
-            if (route == "home") {
-                androidx.compose.foundation.layout.Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.End
-                ) {
-                    androidx.compose.material3.IconButton(onClick = { nav.navigate("settings") { launchSingleTop = true } }) {
-                        Text("⚙️", fontSize = 22.sp)
-                    }
-                }
-            }
-        },
+        topBar = { },
         snackbarHost = { SnackbarHost(snack) },
         bottomBar = {
             NavigationBar {
@@ -180,10 +177,17 @@ fun MainScaffold(vm: AppViewModel) {
                     NavigationBarItem(
                         selected = selected,
                         onClick = { navTab(nav, t.route) },
-                        icon = { Text(t.icon) },
-                        label = { Text(t.label) },
+                        icon = {
+                            Box(
+                                Modifier.size(34.dp).clip(t.shape).background(if (selected) t.color else t.color.copy(alpha = 0.22f)),
+                                contentAlignment = androidx.compose.ui.Alignment.Center
+                            ) { Text(t.icon, fontSize = 16.sp) }
+                        },
+                        label = { Text(t.label, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal) },
                         colors = androidx.compose.material3.NavigationBarItemDefaults.colors(
-                            indicatorColor = MaterialTheme.colorScheme.primaryContainer
+                            selectedTextColor = t.color,
+                            unselectedTextColor = t.color.copy(alpha = 0.8f),
+                            indicatorColor = androidx.compose.ui.graphics.Color.Transparent
                         )
                     )
                 }

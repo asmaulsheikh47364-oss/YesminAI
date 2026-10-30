@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Card
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -64,60 +65,73 @@ private fun goTo(ctx: Context, i: Intent) {
     }
 }
 
-/** One place inside the app that asks for everything. Runtime permissions come as normal pop-ups; the few that Android only allows from its own screens open with one tap and are ticked off automatically when you return. */
+private fun buildItems(ctx: Context, ok: Boolean, ask: (Array<String>) -> Unit): List<PermItem> {
+    val assistant = (Settings.Secure.getString(ctx.contentResolver, "assistant") ?: "") + (Settings.Secure.getString(ctx.contentResolver, "voice_interaction_service") ?: "")
+    val items = ArrayList<PermItem>()
+    items.add(PermItem("Microphone", "Aapki awaaz sunne ke liye", ok && granted(ctx, Manifest.permission.RECORD_AUDIO)) { ask(arrayOf(Manifest.permission.RECORD_AUDIO)) })
+    items.add(PermItem("Contacts", "Naam se call ya message ke liye", ok && granted(ctx, Manifest.permission.READ_CONTACTS)) { ask(arrayOf(Manifest.permission.READ_CONTACTS)) })
+    items.add(PermItem("Location", "Aap kahan hain ye batane aur map ke kaam ke liye", ok && granted(ctx, Manifest.permission.ACCESS_FINE_LOCATION)) { ask(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)) })
+    items.add(PermItem("Camera", "Camera se cheezein dekhne aur samjhane ke liye", ok && granted(ctx, Manifest.permission.CAMERA)) { ask(arrayOf(Manifest.permission.CAMERA)) })
+    if (android.os.Build.VERSION.SDK_INT >= 33) {
+        items.add(PermItem("Notifications", "Voice session ka status dikhane ke liye", ok && granted(ctx, Manifest.permission.POST_NOTIFICATIONS)) { ask(arrayOf(Manifest.permission.POST_NOTIFICATIONS)) })
+    }
+    if (TermuxBridge.installed(ctx)) {
+        items.add(PermItem("Termux se kaam", "Bolkar Termux mein code chalane ke liye", ok && TermuxBridge.permitted(ctx)) { ask(arrayOf(TermuxBridge.PERM)) })
+    }
+    items.add(PermItem("Display over other apps", "Dusre app ke upar kinare ki light aur kaam ka panel dikhane ke liye", ok && Settings.canDrawOverlays(ctx)) {
+        goTo(ctx, Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + ctx.packageName)))
+    })
+    items.add(PermItem("Battery unrestricted", "Background mein band na ho, isliye", ok && (ctx.getSystemService(Context.POWER_SERVICE) as PowerManager).isIgnoringBatteryOptimizations(ctx.packageName)) {
+        goTo(ctx, Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:" + ctx.packageName)))
+    })
+    items.add(PermItem("Accessibility", if (ok && YesminAccessibilityService.status(ctx) == "ENABLED_NOT_CONNECTED") "Settings mein ON hai par service jud nahi payi: Payal ko ek baar OFF karke phir ON karo" else "Screen padhne, tap aur type karne ke liye (Android 13+ mein pehle App info > teen bindu > Allow restricted settings)", ok && YesminAccessibilityService.isRunning()) {
+        goTo(ctx, Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+    })
+    items.add(PermItem("Notification access", "Aaye message padhne ke liye (optional)", ok && NotificationManagerCompat.getEnabledListenerPackages(ctx).contains(ctx.packageName)) {
+        goTo(ctx, Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+    })
+    items.add(PermItem("Power button se Payal", "Digital assistant mein Payal chuno", ok && assistant.contains(ctx.packageName)) {
+        goTo(ctx, Intent(Settings.ACTION_VOICE_INPUT_SETTINGS))
+    })
+    return items
+}
+
 @Composable
-fun PermissionSetup() {
-    val ctx = LocalContext.current
+private fun refreshTick(): Int {
     var refresh by remember { mutableStateOf(0) }
-    var shown by remember { mutableStateOf(true) }
     val owner = LocalLifecycleOwner.current
     DisposableEffect(owner) {
         val obs = LifecycleEventObserver { _, e -> if (e == Lifecycle.Event.ON_RESUME) refresh++ }
         owner.lifecycle.addObserver(obs)
         onDispose { owner.lifecycle.removeObserver(obs) }
     }
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { refresh++ }
+    return refresh
+}
+
+/** Asked only once, the first time the app opens. Anything skipped stays listed in Settings. */
+@Composable
+fun PermissionSetup() {
+    val ctx = LocalContext.current
+    val prefs = remember { ctx.getSharedPreferences("yesmin_ui", Context.MODE_PRIVATE) }
+    var shown by remember { mutableStateOf(!prefs.getBoolean("perm_asked", false)) }
+    val refresh = refreshTick()
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
     LaunchedEffect(Unit) {
-        val m = runtimeMissing(ctx)
-        if (m.isNotEmpty()) launcher.launch(m.toTypedArray())
+        if (shown) {
+            val m = runtimeMissing(ctx)
+            if (m.isNotEmpty()) launcher.launch(m.toTypedArray())
+            prefs.edit().putBoolean("perm_asked", true).apply()
+        }
     }
-
-    val ok = refresh >= 0
-    val assistant = (Settings.Secure.getString(ctx.contentResolver, "assistant") ?: "") + (Settings.Secure.getString(ctx.contentResolver, "voice_interaction_service") ?: "")
-    val items = ArrayList<PermItem>()
-    items.add(PermItem("Microphone", "Aapki awaaz sunne ke liye", ok && granted(ctx, Manifest.permission.RECORD_AUDIO)) { launcher.launch(arrayOf(Manifest.permission.RECORD_AUDIO)) })
-    items.add(PermItem("Contacts", "Naam se call ya message ke liye", ok && granted(ctx, Manifest.permission.READ_CONTACTS)) { launcher.launch(arrayOf(Manifest.permission.READ_CONTACTS)) })
-    items.add(PermItem("Location", "Aap kahan hain ye batane aur map ke kaam ke liye", ok && granted(ctx, Manifest.permission.ACCESS_FINE_LOCATION)) { launcher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)) })
-    items.add(PermItem("Camera", "Camera se cheezein dekhne aur samjhane ke liye", ok && granted(ctx, Manifest.permission.CAMERA)) { launcher.launch(arrayOf(Manifest.permission.CAMERA)) })
-    if (android.os.Build.VERSION.SDK_INT >= 33) {
-        items.add(PermItem("Notifications", "Voice session ka status dikhane ke liye", ok && granted(ctx, Manifest.permission.POST_NOTIFICATIONS)) { launcher.launch(arrayOf(Manifest.permission.POST_NOTIFICATIONS)) })
-    }
-    if (TermuxBridge.installed(ctx)) {
-        items.add(PermItem("Termux se kaam", "Bolkar Termux mein code chalane ke liye", ok && TermuxBridge.permitted(ctx)) { launcher.launch(arrayOf(TermuxBridge.PERM)) })
-    }
-    items.add(PermItem("Display over other apps", "Dusre ap mein bhi kinare ki light dikhane ke liye", ok && Settings.canDrawOverlays(ctx)) {
-        goTo(ctx, Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + ctx.packageName)))
-    })
-    items.add(PermItem("Battery unrestricted", "Background mein band na ho, isliye", ok && (ctx.getSystemService(Context.POWER_SERVICE) as PowerManager).isIgnoringBatteryOptimizations(ctx.packageName)) {
-        goTo(ctx, Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:" + ctx.packageName)))
-    })
-    items.add(PermItem("Accessibility", if (ok && YesminAccessibilityService.status(ctx) == "ENABLED_NOT_CONNECTED") "Settings mein ON hai par service jud nahi payi: Yesmin AI ko ek baar OFF karke phir ON karo" else "Screen padhne, tap aur type karne ke liye (Android 13+ mein pehle App info > teen bindu > Allow restricted settings)", ok && YesminAccessibilityService.isRunning()) {
-        goTo(ctx, Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-    })
-    items.add(PermItem("Notification access", "Aaye message padhne ke liye (optional)", ok && NotificationManagerCompat.getEnabledListenerPackages(ctx).contains(ctx.packageName)) {
-        goTo(ctx, Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
-    })
-    items.add(PermItem("Power button se Yesmin", "Digital assistant mein Yesmin AI chuno", ok && assistant.contains(ctx.packageName)) {
-        goTo(ctx, Intent(Settings.ACTION_VOICE_INPUT_SETTINGS))
-    })
-
-    if (!shown || items.all { it.ok }) return
+    if (!shown) return
+    val items = buildItems(ctx, refresh >= 0) { launcher.launch(it) }
+    if (items.all { it.ok }) return
     AlertDialog(
         onDismissRequest = { shown = false },
         title = { Text("Setup: sab permissions yahin") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("Jo baaki hai uske saamne Do dabao. Wapas aate hi tick apne aap lag jaata hai.", style = MaterialTheme.typography.bodySmall)
+                Text("Jo baaki hai uske saamne Do dabao. Jo abhi chhoot jaye wo baad mein Settings mein dikhega.", style = MaterialTheme.typography.bodySmall)
                 items.forEach { p ->
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(if (p.ok) "✅" else "⭕")
@@ -137,4 +151,28 @@ fun PermissionSetup() {
             }) { Text("App info") }
         }
     )
+}
+
+/** Settings list of permissions that are still missing. Draws nothing when everything is granted. */
+@Composable
+fun MissingPermissions() {
+    val ctx = LocalContext.current
+    val refresh = refreshTick()
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
+    val miss = buildItems(ctx, refresh >= 0) { launcher.launch(it) }.filter { !it.ok }
+    if (miss.isEmpty()) return
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("Baaki permissions", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            miss.forEach { p ->
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Column(Modifier.weight(1f)) {
+                        Text(p.title, fontWeight = FontWeight.Bold)
+                        Text(p.why, style = MaterialTheme.typography.bodySmall)
+                    }
+                    Button(onClick = p.action) { Text("Do") }
+                }
+            }
+        }
+    }
 }

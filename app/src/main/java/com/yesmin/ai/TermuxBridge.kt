@@ -45,7 +45,7 @@ object TermuxBridge {
 
     fun setupHelp(ctx: Context): String {
         if (!installed(ctx)) return "Termux phone mein nahi mila. Termux install karna hoga."
-        if (!permitted(ctx)) return "Termux ki permission nahi mili. Yesmin Settings mein Termux section mein Permission do dabana hoga."
+        if (!permitted(ctx)) return "Termux ki permission nahi mili. Payal ki Settings mein baaki permissions list mein Termux ke saamne Do dabana hoga."
         return "Termux ready hai."
     }
 

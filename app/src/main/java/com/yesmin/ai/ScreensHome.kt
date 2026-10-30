@@ -38,6 +38,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
@@ -161,7 +163,7 @@ fun Bubble(m: ChatMsg, vm: AppViewModel) {
         }
     } else {
         Column(Modifier.fillMaxWidth().padding(end = 6.dp)) {
-            Text("✦ Yesmin", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.labelLarge)
+            Text("✦ Payal", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.labelLarge)
             Column(Modifier.padding(top = 6.dp)) {
                 if (m.error) Text(m.text, color = MaterialTheme.colorScheme.error) else RichText(m.text, onSave = { vm.addMemory("snippet", it) })
             }
@@ -189,56 +191,11 @@ fun HomeScreen(vm: AppViewModel, nav: NavHostController) {
             micLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
     }
-    val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
-    val greet = when {
-        hour < 12 -> "Good morning"
-        hour < 17 -> "Good afternoon"
-        else -> "Good evening"
-    }
-    val title = if (vm.userName.isBlank()) greet else greet + ", " + vm.userName
-    val quick = listOf(
-        "▶ YouTube music" to "youtube par music kholo",
-        "🔋 Battery" to "battery kitni hai",
-        "🕒 Time" to "abhi time kya hai",
-        "📶 Internet" to "internet status"
-    )
-    val recent = vm.messages.filter { it.fromUser }.takeLast(3).reversed()
-    Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        HomeHero(vm, title) { onMic() }; PermissionSetup()
-
-        Text("Quick commands", style = MaterialTheme.typography.titleMedium, modifier = Modifier.fillMaxWidth())
-        quick.chunked(2).forEach { row ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                row.forEach { (label, cmd) ->
-                    val tint = listOf(
-                        androidx.compose.ui.graphics.Color(0xFFDC2626), androidx.compose.ui.graphics.Color(0xFF16A34A),
-                        androidx.compose.ui.graphics.Color(0xFF2563EB), androidx.compose.ui.graphics.Color(0xFF7C3AED)
-                    )[quick.indexOfFirst { it.first == label }.coerceAtLeast(0) % 4]
-                    Button(
-                        onClick = { vm.send(cmd, false); nav.navigate("chat") { launchSingleTop = true } },
-                        shape = RoundedCornerShape(16.dp),
-                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                            containerColor = tint, contentColor = androidx.compose.ui.graphics.Color.White
-                        ),
-                        modifier = Modifier.weight(1f)
-                    ) { Text(label, maxLines = 1) }
-                }
-            }
-        }
-        Card(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("Recent", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                if (recent.isEmpty()) Text("Abhi koi baat nahi hui.", style = MaterialTheme.typography.bodySmall)
-                recent.forEach { Text("• " + it.text.take(60), style = MaterialTheme.typography.bodySmall) }
-            }
-        }
+    Box(Modifier.fillMaxSize()) {
+        HomeHero(vm, { nav.navigate("settings") { launchSingleTop = true } }) { onMic() }
+        PermissionSetup()
     }
 }
-
 // ---------- Chat ----------
 
 @Composable
@@ -246,6 +203,7 @@ fun ChatScreen(vm: AppViewModel) {
     val ctx = LocalContext.current
     var input by remember { mutableStateOf("") }
     var showAttach by remember { mutableStateOf(false) }
+    var showMenu by remember { mutableStateOf(false) }
     val fileLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             val name = ctx.contentResolver.query(uri, null, null, null, null)?.use { c ->
@@ -279,64 +237,73 @@ fun ChatScreen(vm: AppViewModel) {
             micLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
     }
-    val glow = rememberInfiniteTransition(label = "goldGlow")
-    val glowAlpha by glow.animateFloat(
-        initialValue = 0.25f,
-        targetValue = 0.85f,
-        animationSpec = infiniteRepeatable(tween(2600, easing = LinearEasing), RepeatMode.Reverse),
-        label = "glowAlpha"
-    )
-    Column(
-        Modifier.fillMaxSize().imePadding().navigationBarsPadding()
-    ) {
-        Box(Modifier.fillMaxWidth().height(96.dp)) {
-            Box(
-                Modifier.fillMaxSize().background(
-                    Brush.verticalGradient(listOf(Color(0x40FFD54F), Color(0x00000000)))
-                )
+    fun doSend() {
+        if (input.isNotBlank()) {
+            vm.send(input, false)
+            input = ""
+        }
+    }
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant
+    Column(Modifier.fillMaxSize().imePadding().navigationBarsPadding()) {
+        Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                if (vm.tempMode) "Temporary chat" else "",
+                style = MaterialTheme.typography.labelMedium, color = muted, modifier = Modifier.weight(1f)
             )
-            Box(
-                Modifier.align(Alignment.TopCenter).size(240.dp).graphicsLayer { alpha = glowAlpha }
-                    .background(
-                        Brush.radialGradient(listOf(Color(0x59FFC107), Color(0x00000000))),
-                        CircleShape
+            if (vm.voiceState == VoiceState.Listening) TextButton(onClick = { vm.cancelListening() }) { Text("Sunna band") }
+            if (vm.voiceState == VoiceState.Speaking) TextButton(onClick = { vm.stopSpeaking() }) { Text("Bolna band") }
+            Box {
+                TextButton(onClick = { showMenu = true }) { Text("⋯", fontSize = 22.sp, color = muted) }
+                DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                    DropdownMenuItem(
+                        text = { Text(if (vm.tempMode) "Temporary chat band karo" else "Temporary chat") },
+                        onClick = { vm.tempMode = !vm.tempMode; showMenu = false }
                     )
-            )
-            Row(
-                Modifier.align(Alignment.BottomStart).fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                FilterChip(selected = vm.tempMode, onClick = { vm.tempMode = !vm.tempMode }, label = { Text("🕶 Temporary chat") })
-                Personas.names.forEach { n ->
-                    FilterChip(selected = vm.persona == n, onClick = { vm.changePersona(n) }, label = { Text(n) })
+                    Personas.names.forEach { n ->
+                        DropdownMenuItem(
+                            text = { Text((if (vm.persona == n) "✓ " else "") + n) },
+                            onClick = { vm.changePersona(n); showMenu = false }
+                        )
+                    }
+                    if (vm.messages.isNotEmpty()) {
+                        DropdownMenuItem(text = { Text("Nayi chat (clear)") }, onClick = { vm.clearChat(); showMenu = false })
+                    }
                 }
             }
         }
-        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(vm.statusLabel(), style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
-            if (vm.voiceState == VoiceState.Listening) TextButton(onClick = { vm.cancelListening() }) { Text("Cancel listening") }
-            if (vm.voiceState == VoiceState.Speaking) TextButton(onClick = { vm.stopSpeaking() }) { Text("Stop speaking") }
-            if (vm.messages.isNotEmpty()) TextButton(onClick = { vm.clearChat() }) { Text("Clear") }
-        }
         if (vm.messages.isEmpty()) {
-            Column(Modifier.weight(1f).padding(24.dp), verticalArrangement = Arrangement.Center) {
-                Text("Namaste! 👋", style = MaterialTheme.typography.headlineSmall)
-                Text("Mic dabao ya type karo. Try karo:")
-                Text("• YouTube kholo")
-                Text("• Arijit Singh ke songs YouTube par")
-                Text("• battery kitni hai")
-                Text("• 12 + 8 x 3")
-                Text("• Kotlin mein calculator ka code likho")
-                if (!vm.hasKey) Text("AI jawab ke liye AI Brain tab mein Gemini key daalo. Local commands bina key ke chalte hain.")
+            Column(
+                Modifier.weight(1f).fillMaxWidth().padding(horizontal = 28.dp),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text("✦", fontSize = 40.sp, color = MaterialTheme.colorScheme.primary)
+                Text(
+                    "How can I help you today?",
+                    fontFamily = FontFamily.Serif, fontSize = 28.sp,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    modifier = Modifier.padding(top = 12.dp)
+                )
+                if (!vm.hasKey) {
+                    Text(
+                        "AI jawab ke liye AI Brain tab mein Gemini key daalo.",
+                        style = MaterialTheme.typography.bodySmall, color = muted,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        modifier = Modifier.padding(top = 14.dp)
+                    )
+                }
             }
         } else {
             LazyColumn(
-                Modifier.weight(1f).padding(horizontal = 12.dp),
+                Modifier.weight(1f).fillMaxWidth(),
                 state = listState,
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(vertical = 8.dp)
+                verticalArrangement = Arrangement.spacedBy(20.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
             ) {
                 items(vm.messages.size) { i -> Bubble(vm.messages[i], vm) }
+                if (vm.busy) {
+                    item { Text("✦ Payal likh rahi hai…", style = MaterialTheme.typography.bodySmall, color = muted) }
+                }
             }
         }
         vm.pending?.let { p ->
@@ -364,46 +331,52 @@ fun ChatScreen(vm: AppViewModel) {
                 }
             }
         }
-        if (vm.busy) Text("Gemini jawab likh raha hai…", Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.labelMedium)
         Surface(
-            shape = RoundedCornerShape(30.dp),
+            shape = RoundedCornerShape(28.dp),
             color = MaterialTheme.colorScheme.surfaceVariant,
-            modifier = Modifier.fillMaxWidth().padding(8.dp)
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp)
         ) {
-            Row(Modifier.padding(6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(Modifier.padding(start = 6.dp, end = 10.dp, top = 4.dp, bottom = 10.dp)) {
                 OutlinedTextField(
                     value = input, onValueChange = { input = it },
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = androidx.compose.ui.graphics.Color.Transparent,
-                        unfocusedBorderColor = androidx.compose.ui.graphics.Color.Transparent
+                        focusedBorderColor = Color.Transparent,
+                        unfocusedBorderColor = Color.Transparent
                     ),
-                    placeholder = { Text("Yesmin se kuch bhi poocho…") },
-                    maxLines = 4,
+                    placeholder = { Text("Payal se baat karo", color = muted) },
+                    maxLines = 6,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                    keyboardActions = KeyboardActions(onSend = { vm.send(input, false); input = "" })
+                    keyboardActions = KeyboardActions(onSend = { doSend() })
                 )
-                Box {
-                    FilledTonalButton(onClick = { showAttach = !showAttach }, shape = CircleShape, contentPadding = PaddingValues(14.dp)) { Text("📎") }
-                    if (showAttach) {
-                        Card(Modifier.align(Alignment.BottomEnd)) {
-                            Column {
-                                TextButton(onClick = { showAttach = false; fileLauncher.launch(arrayOf("*/*")) }) { Text("📁 File bhejo") }
-                                TextButton(onClick = { showAttach = false; imageLauncher.launch("image/*") }) { Text("🖼 Photo bhejo") }
-                                TextButton(onClick = { showAttach = false; cameraLauncher.launch(null) }) { Text("📷 Photo kheencho") }
-                            }
+                Row(Modifier.fillMaxWidth().padding(start = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box {
+                        Box(
+                            Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surface).clickable { showAttach = !showAttach },
+                            contentAlignment = Alignment.Center
+                        ) { Text("+", fontSize = 22.sp, color = muted) }
+                        DropdownMenu(expanded = showAttach, onDismissRequest = { showAttach = false }) {
+                            DropdownMenuItem(text = { Text("File bhejo") }, onClick = { showAttach = false; fileLauncher.launch(arrayOf("*/*")) })
+                            DropdownMenuItem(text = { Text("Gallery se photo") }, onClick = { showAttach = false; imageLauncher.launch("image/*") })
+                            DropdownMenuItem(text = { Text("Camera se photo") }, onClick = { showAttach = false; cameraLauncher.launch(null) })
                         }
                     }
+                    Box(Modifier.weight(1f))
+                    Box(
+                        Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surface).clickable { onMic() },
+                        contentAlignment = Alignment.Center
+                    ) { Text(if (vm.voiceState == VoiceState.Listening) "⏹" else "🎙", fontSize = 17.sp) }
+                    Box(
+                        Modifier.padding(start = 8.dp).size(40.dp).clip(CircleShape)
+                            .background(if (input.isBlank()) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.primary)
+                            .clickable { doSend() },
+                        contentAlignment = Alignment.Center
+                    ) { Text("↑", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary) }
                 }
-                FilledTonalButton(onClick = { onMic() }, shape = CircleShape, contentPadding = PaddingValues(14.dp)) {
-                    Text(if (vm.voiceState == VoiceState.Listening) "⏹" else "🎤")
-                }
-                Button(onClick = { vm.send(input, false); input = "" }, shape = CircleShape, contentPadding = PaddingValues(14.dp)) { Text("↑") }
             }
         }
     }
 }
-
 @Composable
 fun AgentCard() {
     val ctx = LocalContext.current

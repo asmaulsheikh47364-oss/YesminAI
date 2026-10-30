@@ -160,7 +160,7 @@ class LiveVoice(
             .put("outputAudioTranscription", JSONObject())
             .put("tools", JSONArray()
                 .also { if (useSearch) it.put(JSONObject().put("googleSearch", JSONObject())) }
-                .put(JSONObject().put("functionDeclarations", JSONArray().put(phoneTool()).put(JSONObject().put("name", "read_screen").put("description", "Returns the text currently visible on the user phone screen. Call it whenever the user asks what is on the screen, asks you to read or explain something shown, or says this or here about something on screen.")).put(JSONObject().put("name", "recent_activity").put("description", "Returns what the user recently did on the phone (taps and screens opened). Call it when the user asks what they just did or what happened.")).put(JSONObject().put("name", "stop_assistant").put("description", "Fully switch Yesmin off. Call it only when the user says her name (Yesmin) and tells her to stop, close or switch off. Say one short goodbye line in the same turn.")).put(JSONObject().put("name", "pause_assistant").put("description", "Make Yesmin quiet for a while. Call it only when the user says her name (Yesmin) and asks her to be quiet or pause for some time. Say one short line like okay in the same turn.")).put(
+                .put(JSONObject().put("functionDeclarations", JSONArray().put(phoneTool()).put(JSONObject().put("name", "read_screen").put("description", "Returns the text currently visible on the user phone screen. Call it whenever the user asks what is on the screen, asks you to read or explain something shown, or says this or here about something on screen.")).put(JSONObject().put("name", "recent_activity").put("description", "Returns what the user recently did on the phone (taps and screens opened). Call it when the user asks what they just did or what happened.")).put(JSONObject().put("name", "stop_assistant").put("description", "Fully switch Payal off. Call it only when the user says her name (Payal or Yesmin) and tells her to stop, close or switch off. Say one short goodbye line in the same turn.")).put(JSONObject().put("name", "pause_assistant").put("description", "Make Payal quiet for a while. Call it only when the user says her name (Payal or Yesmin) and asks her to be quiet or pause for some time. Say one short line like okay in the same turn.")).put(
                     JSONObject().put("name", "get_current_time")
                         .put("description", "Returns the exact current date and time in India (IST). Call it every time the user asks the time or date."))
                     .put(JSONObject().put("name", "get_location").put("description", "Returns the phone current location (coordinates, address and a map link). Call it when the user asks where he is, nearby places, directions or the map.")))))
@@ -192,6 +192,15 @@ class LiveVoice(
                     val f = java.text.SimpleDateFormat("EEEE, d MMMM yyyy, h:mm a", java.util.Locale.ENGLISH)
                     f.timeZone = java.util.TimeZone.getTimeZone("Asia/Kolkata")
                     val nm = c.optString("name")
+                    if (nm == "get_location") {
+                        val locId = c.optString("id")
+                        Thread {
+                            val locRes = LocationHelper.describe(context)
+                            val locOne = JSONArray().put(JSONObject().put("id", locId).put("name", "get_location").put("response", JSONObject().put("result", locRes)))
+                            ws?.send(JSONObject().put("toolResponse", JSONObject().put("functionResponses", locOne)).toString())
+                        }.also { it.isDaemon = true }.start()
+                        continue
+                    }
                     if (nm == "phone_command") {
                         val callId = c.optString("id")
                         val args = c.optJSONObject("args")
@@ -218,10 +227,10 @@ class LiveVoice(
                     val result = when (nm) {
                         "get_current_time" -> f.format(java.util.Date()) + " IST"
                         "get_location" -> LocationHelper.describe(context)
-                        "read_screen" -> YesminAccessibilityService.instance?.dumpScreen() ?: if (YesminAccessibilityService.isEnabledInSettings(context)) "Accessibility Android Settings mein ON hai, lekin Jasmine service abhi connect nahi hai. Screen abhi read nahi ho pa rahi." else "Accessibility Android Settings mein OFF dikh rahi hai."
+                        "read_screen" -> YesminAccessibilityService.instance?.dumpScreen() ?: if (YesminAccessibilityService.isEnabledInSettings(context)) "Accessibility Android Settings mein ON hai, lekin Payal service abhi connect nahi hai. Screen abhi read nahi ho pa rahi." else "Accessibility Android Settings mein OFF dikh rahi hai."
                         "recent_activity" -> YesminAccessibilityService.instance?.recentActivity()
                             ?: if (YesminAccessibilityService.isEnabledInSettings(context))
-                                "Accessibility Android Settings mein ON hai, lekin Jasmine service abhi connect nahi hai."
+                                "Accessibility Android Settings mein ON hai, lekin Payal service abhi connect nahi hai."
                             else
                                 "Accessibility Android Settings mein OFF dikh rahi hai."
                         else -> "ok, now say one very short goodbye line"
@@ -377,7 +386,7 @@ class LiveVoice(
 
     private fun hasName(t: String): Boolean {
         val x = t.lowercase()
-        return listOf("yesmin", "yasmin", "yasmeen", "yasmine", "yesmeen", "esmin", "asmin", "jasmin",
+        return listOf("payal", "paayal", "pyal", "पायल", "yesmin", "yasmin", "yasmeen", "yasmine", "yesmeen", "esmin", "asmin", "jasmin",
             "यास्मिन", "येस्मिन", "यस्मिन", "एस्मिन", "यैस्मिन", "यास्मीन", "एसमिन", "यासमिन", "यस्मीन").any { x.contains(it) }
     }
 

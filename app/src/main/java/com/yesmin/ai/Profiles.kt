@@ -19,14 +19,14 @@ data class Profile(
 object Profiles {
     val all = listOf(
         Profile(
-            "yesmin", "Yesmin", "Kind & Friendly",
+            "yesmin", "Payal", "Kind & Friendly",
             "warm, caring, gentle and encouraging, like a kind close friend",
-            "Y", Color(0xFF22D3EE), Color(0xFF8B5CF6), 1.1f, 1.0f, "Kore"
+            "P", Color(0xFF22D3EE), Color(0xFF8B5CF6), 1.1f, 1.0f, "Kore"
         ),
         Profile(
             "zara", "Zara", "Cool & Smart",
             "confident, witty, sharp and concise; gets straight to the point with a light touch of humour",
-            "Z", Color(0xFF8B5CF6), Color(0xFF3B82F6), 1.0f, 1.05f, "Leda"
+            "Z", Color(0xFF8B5CF6), Color(0xFF3B82F6), 1.0f, 1.05f, "Zephyr"
         ),
         Profile(
             "riya", "Riya", "Positive & Energetic",
@@ -36,7 +36,7 @@ object Profiles {
         Profile(
             "aisha", "Aisha", "Calm & Helpful",
             "calm, soothing, patient and thoughtful; explains things slowly and clearly",
-            "A", Color(0xFF14B8A6), Color(0xFF22D3EE), 0.95f, 0.9f, "Sulafat"
+            "A", Color(0xFF14B8A6), Color(0xFF22D3EE), 0.95f, 0.9f, "Gacrux"
         )
     )
 

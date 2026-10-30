@@ -59,7 +59,7 @@ object Biometric {
         try {
             val executor = ContextCompat.getMainExecutor(activity)
             val bp = BiometricPrompt.Builder(activity)
-                .setTitle("Yesmin AI unlock")
+                .setTitle("Payal unlock")
                 .setNegativeButton("PIN use karo", executor) { _, _ -> onFail() }
                 .build()
             bp.authenticate(CancellationSignal(), executor, object : BiometricPrompt.AuthenticationCallback() {

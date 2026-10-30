@@ -30,7 +30,7 @@ class StandbyService : Service() {
     @Volatile private var gen = 0
     private var worker: Thread? = null
 
-    private val nameRegex = Regex("yesmin|yasmin|yasmeen|yasmine|jasmin|jasmine|yes mean|yes men|yes min|yes mind|yaz min|us mean|as mean|yes mine|यास्मिन|येस्मिन|यस्मिन|एस्मिन")
+    private val nameRegex = Regex("payal|paayal|pyal|पायल|yesmin|yasmin|yasmeen|yasmine|jasmin|jasmine|yes mean|yes men|yes min|yes mind|yaz min|us mean|as mean|yes mine|यास्मिन|येस्मिन|यस्मिन|एस्मिन")
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -64,7 +64,7 @@ class StandbyService : Service() {
 
     private fun notification(): Notification {
         getSystemService(NotificationManager::class.java)
-            .createNotificationChannel(NotificationChannel(CHANNEL, "Yesmin standby", NotificationManager.IMPORTANCE_LOW))
+            .createNotificationChannel(NotificationChannel(CHANNEL, "Payal standby", NotificationManager.IMPORTANCE_LOW))
         val open = PendingIntent.getActivity(
             this, 7,
             Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
@@ -76,8 +76,8 @@ class StandbyService : Service() {
         )
         return NotificationCompat.Builder(this, CHANNEL)
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
-            .setContentTitle("Yesmin standby")
-            .setContentText("Bolo: Yesmin")
+            .setContentTitle("Payal standby")
+            .setContentText("Bolo: Payal")
             .setContentIntent(open)
             .addAction(0, "Standby band", off)
             .setOngoing(true)
@@ -114,7 +114,7 @@ class StandbyService : Service() {
                 return
             }
             ar.startRecording()
-            Dbg.log(this, "standby chalu: Yesmin bolo")
+            Dbg.log(this, "standby chalu: Payal bolo")
             val buf = ByteArray(4096)
             while (alive && !sessionBusy()) {
                 val n = ar.read(buf, 0, buf.size)

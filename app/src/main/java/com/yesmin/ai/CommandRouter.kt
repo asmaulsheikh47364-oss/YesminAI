@@ -40,17 +40,17 @@ sealed class Command {
 /** Pure Kotlin (no Android classes) so it can be unit-tested. */
 object CommandRouter {
     private val calcRe = Regex(
-        "^\\s*(?:yesmin[, ]*)?(?:calculate|calc|hisab|hisaab|solve)?\\s*([0-9+\\-*/().%x×÷ ]+)$",
+        "^\\s*(?:(?:payal|yesmin)[, ]*)?(?:calculate|calc|hisab|hisaab|solve)?\\s*([0-9+\\-*/().%x×÷ ]+)$",
         RegexOption.IGNORE_CASE
     )
     private val msgRe = Regex(
-        "(?i)^\\s*(?:(?:yesmin|zara|riya|aisha)[, ]*)?(.+?)\\s+ko\\s+(whatsapp|sms|message|msg)(?:\\s+(?:message|msg))?(?:\\s+(?:par|pe|mein|me))?\\s+(?:bhejo|bhej do|karo|send|likho)\\s*[:,-]?\\s*(.*)$"
+        "(?i)^\\s*(?:(?:payal|yesmin|zara|riya|aisha)[, ]*)?(.+?)\\s+ko\\s+(whatsapp|sms|message|msg)(?:\\s+(?:message|msg))?(?:\\s+(?:par|pe|mein|me))?\\s+(?:bhejo|bhej do|karo|send|likho)\\s*[:,-]?\\s*(.*)$"
     )
-    private val replyRe = Regex("(?i)^\\s*(?:(?:yesmin|zara|riya|aisha)[, ]*)?reply\\s*(?:(?:karo|do|bhejo|send)\\s*[:,-]?|[:,-])\\s*(.+)$")
-    private val typeRe = Regex("(?i)^(?:yesmin[, ]*)?type\\s+(.+)$")
+    private val replyRe = Regex("(?i)^\\s*(?:(?:payal|yesmin|zara|riya|aisha)[, ]*)?reply\\s*(?:(?:karo|do|bhejo|send)\\s*[:,-]?|[:,-])\\s*(.+)$")
+    private val typeRe = Regex("(?i)^(?:(?:payal|yesmin)[, ]*)?type\\s+(.+)$")
 
     private val stop = setOf(
-        "yesmin", "jasmine", "jasmin", "yasmin", "youtube", "yt", "par", "pe", "mein", "me", "kholo", "khol", "do", "open", "search", "karo",
+        "payal", "yesmin", "jasmine", "jasmin", "yasmin", "youtube", "yt", "par", "pe", "mein", "me", "kholo", "khol", "do", "open", "search", "karo",
         "kar", "karna", "ke", "ka", "ki", "ko", "mera", "meri", "mere", "favorite", "favourite", "please", "plz",
         "song", "songs", "gaane", "gana", "gaana", "gane", "music", "sunao", "chalao", "play", "dikhao", "dhundo",
         "laga", "lagao", "on", "in", "for", "the", "a", "hai", "kya", "mujhe", "ek", "bhi",
@@ -63,7 +63,7 @@ object CommandRouter {
     )
     private val openWords = setOf("kholo", "khol", "open", "launch", "chalu", "start", "kholna", "खोलो", "खोल")
     private val filler = setOf(
-        "yesmin", "jasmine", "jasmin", "yasmin", "please", "plz", "ko", "app", "ek", "mujhe", "mera", "meri", "ka", "ki", "ke", "par", "pe",
+        "payal", "yesmin", "jasmine", "jasmin", "yasmin", "please", "plz", "ko", "app", "ek", "mujhe", "mera", "meri", "ka", "ki", "ke", "par", "pe",
         "mein", "me", "karo", "kar", "do", "the", "na", "zara"
     )
 
@@ -98,7 +98,7 @@ object CommandRouter {
         "वॉल्यूम" to "volume", "आवाज" to "volume", "बढाओ" to "badhao", "बढ\u095Dाओ" to "badhao", "घटाओ" to "ghatao", "कम" to "kam",
         "म्यूट" to "mute", "कॉल" to "call", "मैसेज" to "message", "मैसेजेस" to "messages", "पढो" to "padho", "पढ\u095Dो" to "padho",
         "सुनो" to "suno", "ब्लूटूथ" to "bluetooth", "वाईफाई" to "wifi",
-        "यस्मिन" to "yesmin",
+        "यस्मिन" to "yesmin", "पायल" to "payal",
         "थर्मक्स" to "termux", "थर्मॉक्स" to "termux", "थर्मोक्स" to "termux", "टर्मक्स" to "termux", "टर्मुक्स" to "termux", "थरमक्स" to "termux", "टरमक्स" to "termux", "यसमिन" to "yesmin", "येस्मिन" to "yesmin", "यस्मीन" to "yesmin"
     )
 
@@ -117,7 +117,7 @@ object CommandRouter {
         val text = input.trim()
         if (text.isEmpty()) return Command.None
         var t = tokens(text)
-        if (t.firstOrNull() in setOf("yesmin", "zara", "riya", "aisha", "jasmine", "jasmin", "yasmin")) t = t.drop(1)
+        if (t.firstOrNull() in setOf("payal", "yesmin", "zara", "riya", "aisha", "jasmine", "jasmin", "yasmin")) t = t.drop(1)
         if (t.isEmpty()) return Command.None
 
         a11y(text, t)?.let { return Command.A11y(it) }
@@ -189,7 +189,7 @@ object CommandRouter {
         if (t.size <= 7 && ("dnd" in t || "disturb" in t) && (turnOn || turnOff)) return Command.Dnd(!turnOff)
         val callIdx = t.indexOfFirst { it == "call" || it == "dial" }
         if (callIdx >= 0 && t.size <= 7 && t.any { it in setOf("karo", "kar", "lagao", "laga", "do", "dial", "kardo") }) {
-            val fill = setOf("ko", "par", "pe", "yesmin", "mujhe", "please", "plz", "ek")
+            val fill = setOf("ko", "par", "pe", "payal", "yesmin", "mujhe", "please", "plz", "ek")
             val name = t.take(callIdx).filter { it !in fill }.joinToString(" ")
             if (name.isNotBlank()) return Command.Call(name)
         }

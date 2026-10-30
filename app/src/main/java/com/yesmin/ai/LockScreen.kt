@@ -47,7 +47,7 @@ fun LockScreen(vm: AppViewModel) {
     ) {
         val p = vm.activeProfile()
         NeonAvatar(110.dp, p.letter, p.c1, p.c2)
-        Text("Yesmin AI locked hai", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 12.dp))
+        Text("Payal locked hai", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 12.dp))
         Text("Apna PIN daalo", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(bottom = 12.dp))
         OutlinedTextField(
             value = pin,

@@ -147,7 +147,7 @@ fun VoiceScreen(vm: AppViewModel) {
             contentAlignment = Alignment.Center
         ) { Text(if (!vm.sessionActive) "🎤" else if (vm.sessionPaused) "▶" else "⏸", fontSize = 36.sp) }
         Text(
-            if (!vm.sessionActive) "Mic dabao — baat-cheet shuru. Yesmin baar-baar sunegi jab tak aap Pause ya Stop na karo."
+            if (!vm.sessionActive) "Mic dabao — baat-cheet shuru. Payal baar-baar sunegi jab tak aap Pause ya Stop na karo."
             else if (vm.sessionPaused) "Paused. Dobara shuru karne ke liye ▶ dabao."
             else "Session chalu hai. Mic band karne ke liye ⏸ ya Stop dabao.",
             style = MaterialTheme.typography.bodySmall
@@ -287,9 +287,6 @@ fun MoreScreen(nav: NavHostController) {
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Text("More", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-        NavRow("📱", "Apps & Phone", "App kholo, phone control, YouTube") { nav.navigate("apps") { launchSingleTop = true } }
-        NavRow("📷", "Photo AI", "Photo dikhao aur sawaal poochho") { nav.navigate("vision") { launchSingleTop = true } }
-        NavRow("🧮", "Calculator", "Jodna, ghatana, percent aur aur bhi") { nav.navigate("calc") { launchSingleTop = true } }
         NavRow("💬", "Help & Support", "Creator ki jaankari aur sampark") { nav.navigate("support") { launchSingleTop = true } }
     }
 }
@@ -350,7 +347,7 @@ fun SupportScreen(vm: AppViewModel) {
                 NeonAvatar(76.dp, "A")
                 Text("CREATOR", color = NeonCyan, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 3.sp)
                 Text("Md Asmaul", color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.Bold)
-                Text("Founder & Developer, Yesmin AI", color = Color(0xFFB8C0E0), fontSize = 14.sp)
+                Text("Founder & Developer, Payal", color = Color(0xFFB8C0E0), fontSize = 14.sp)
                 Text("📍 Bhawanipur, Pakur", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium)
                 Text("Jharkhand, India", color = Color(0xFFB8C0E0), fontSize = 14.sp)
                 Button(

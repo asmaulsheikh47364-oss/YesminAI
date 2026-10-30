@@ -50,14 +50,14 @@ fun BrainStatus.label(): String = when (this) {
 fun BrainScreen(vm: AppViewModel) {
     var key by remember { mutableStateOf("") }
     var custom by remember { mutableStateOf(vm.model) }
-    var sample by remember { mutableStateOf("Namaste Yesmin, ek line mein apna intro do.") }
+    var sample by remember { mutableStateOf("Namaste Payal, ek line mein apna intro do.") }
     LaunchedEffect(vm.brainStatus) { if (vm.brainStatus == BrainStatus.Connected) key = "" }
 
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text("YESMIN AI BRAIN", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Text("PAYAL BRAIN", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         Text("Powered by Gemini. Built for your everyday life.")
 
         Card(Modifier.fillMaxWidth()) {

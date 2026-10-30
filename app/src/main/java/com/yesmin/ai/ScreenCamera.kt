@@ -187,7 +187,7 @@ fun CameraScreen(vm: AppViewModel) {
         ) {
             Surface(shape = RoundedCornerShape(22.dp), color = Color(0xCC0B1026), modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(14.dp).verticalScroll(rememberScrollState())) {
-                    Text(if (working) "Dekh rahi hoon…" else "Yesmin ne dekha", color = Color(0xFF22D3EE), style = androidx.compose.material3.MaterialTheme.typography.labelMedium)
+                    Text(if (working) "Dekh rahi hoon…" else "Payal ne dekha", color = Color(0xFF22D3EE), style = androidx.compose.material3.MaterialTheme.typography.labelMedium)
                     Text(text, color = Color.White)
                 }
             }

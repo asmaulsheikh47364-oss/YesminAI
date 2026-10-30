@@ -58,7 +58,7 @@ When the goal is finished or impossible: {"done_reason":"short","action":"done",
         var same = 0
         for (step in 1..25) {
             val svc = YesminAccessibilityService.instance
-                ?: return "Accessibility service chalu nahi hai. Settings mein Yesmin AI ko ek baar OFF karke phir ON karo."
+                ?: return "Accessibility service chalu nahi hai. Settings mein Payal ko ek baar OFF karke phir ON karo."
             val screen = onMain { svc.screenForAgent() }
             hist.add("user" to ("GOAL: " + goal + nl + "LAST RESULT: " + note + nl + "SCREEN NOW:" + nl + screen + nl + "Reply with one JSON action."))
             progress("Step " + step)

@@ -89,9 +89,21 @@ fun ProfilesScreen(vm: AppViewModel) {
                     Text(if (vm.profileId == "custom") "Update karo (Active)" else "Yeh personality use karo")
                 }
                 Text(
-                    "Custom andaaz sirf bolne ka tarika badalta hai. Sachchai, privacy aur safety ke niyam har personality mein same rehte hain, aur Yesmin kabhi insaan hone ka dawa nahi karti.",
+                    "Custom andaaz sirf bolne ka tarika badalta hai. Sachchai, privacy aur safety ke niyam har personality mein same rehte hain, aur Payal kabhi insaan hone ka dawa nahi karti.",
                     style = MaterialTheme.typography.bodySmall
                 )
+            }
+        }
+    }
+}
+
+/** The four characters as a 2x2 grid; used inside Settings. Choosing one also switches a running voice call. */
+@Composable
+fun CharacterPicker(vm: AppViewModel) {
+    Profiles.all.chunked(2).forEach { row ->
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            row.forEach { p ->
+                ProfileCard(p, vm.profileId == p.id, Modifier.weight(1f), { vm.changeProfile(p.id) }, { vm.previewProfile(p) })
             }
         }
     }

@@ -117,7 +117,7 @@ object PhoneControl {
         val nm = ctx.getSystemService(NotificationManager::class.java)
         if (!nm.isNotificationPolicyAccessGranted) {
             openSettings(ctx, "dnd")
-            return "DND badalne ki ijazat chahiye. Settings khol di hai — Yesmin AI ko allow karke dobara bolo."
+            return "DND badalne ki ijazat chahiye. Settings khol di hai — Payal ko allow karke dobara bolo."
         }
         nm.setInterruptionFilter(if (on) NotificationManager.INTERRUPTION_FILTER_PRIORITY else NotificationManager.INTERRUPTION_FILTER_ALL)
         return if (on) "Do Not Disturb on kar diya." else "Do Not Disturb band kar diya."
