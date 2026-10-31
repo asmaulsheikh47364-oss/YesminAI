@@ -345,10 +345,18 @@ fun SupportCard() {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = {
                     status = "Bhej rahe hain..."
-                    Entitlement.sendSupport(kind, plan, ref, msg) { s ->
-                        status = s
-                        if (s.startsWith("Bhej diya")) { ref = ""; msg = ""; Entitlement.supportMine { mine = it } }
+                    val send = { extra: String ->
+                        Entitlement.sendSupport(kind, plan, ref, msg) { s ->
+                            status = (if (extra.isNotEmpty()) extra + " " else "") + s
+                            if (s.startsWith("Bhej diya")) { ref = ""; msg = ""; Entitlement.supportMine { mine = it } }
+                        }
                     }
+                    if (kind == "payment" && ref.trim().startsWith("pay_")) {
+                        status = "Payment jaanch rahe hain..."
+                        Entitlement.claimPayment(ctx, ref.trim()) { ok, t2 ->
+                            if (ok) { status = t2; ref = ""; msg = "" } else send(t2)
+                        }
+                    } else send("")
                 }) { Text("Bhejo") }
                 OutlinedButton(onClick = { Entitlement.openWhatsApp(ctx) }) { Text("WhatsApp") }
             }

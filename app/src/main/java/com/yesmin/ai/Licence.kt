@@ -100,7 +100,7 @@ object Entitlement {
     }
 
     // ---------- login ----------
-    fun loginUrl(): String = SUPA + "/auth/v1/authorize?provider=google&redirect_to=" + Uri.encode("payal://auth")
+    fun loginUrl(): String = SUPA + "/auth/v1/authorize?provider=google&prompt=select_account&redirect_to=" + Uri.encode("payal://auth")
 
     fun startLogin(ctx: Context) {
         info = ""
@@ -267,6 +267,22 @@ object Entitlement {
                 }
             }
             cb(out)
+        }.also { it.isDaemon = true }.start()
+    }
+    // ---------- claim a payment by its Payment ID (pay_...) ----------
+    fun claimPayment(ctx: Context, id: String, cb: (Boolean, String) -> Unit) {
+        Thread {
+            if (!ensureToken()) { cb(false, "Pehle login karo."); return@Thread }
+            var msg = ""
+            var ok = false
+            try {
+                val (code, txt) = http("POST", SUPA + "/functions/v1/pay/claim", JSONObject().put("payment_id", id).toString(), access)
+                val j = try { JSONObject(txt) } catch (e: Exception) { JSONObject() }
+                if (code in 200..299 && j.optBoolean("ok")) { ok = true; msg = "Payment mil gaya. Aapka plan chalu ho gaya." }
+                else msg = j.optString("error", "Abhi pakka nahi hua.")
+            } catch (e: Exception) { msg = "Internet dekho aur dobara try karo." }
+            if (ok) refresh(ctx)
+            cb(ok, msg)
         }.also { it.isDaemon = true }.start()
     }
     // ---------- helpers for the UI ----------
