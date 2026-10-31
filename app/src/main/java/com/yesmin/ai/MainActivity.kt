@@ -57,6 +57,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         ReminderScheduler.createChannel(this)
+        Entitlement.init(this)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         window.navigationBarColor = android.graphics.Color.TRANSPARENT
         if (android.os.Build.VERSION.SDK_INT >= 29) window.isNavigationBarContrastEnforced = false
@@ -74,6 +75,8 @@ class MainActivity : ComponentActivity() {
 
     private fun handleIntent(i: Intent?) {
         if (i == null) return
+        val dd = i.data
+        if (dd != null && dd.scheme == "payal") { Entitlement.handleRedirect(this, dd); return }
         i.getStringExtra("route")?.let { vm.openRoute = it }
         if (i.getBooleanExtra("start_session", false)) {
             vm.openRoute = "home"
@@ -90,6 +93,7 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         AppVisibility.inForeground.value = true
+        Entitlement.refresh(this)
         if (vm.lockEnabled && stoppedAt > 0 && SystemClock.elapsedRealtime() - stoppedAt > 30_000L) vm.locked = true
     }
 }
@@ -119,8 +123,10 @@ fun YesminRoot() {
             Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                 Box(Modifier.fillMaxSize().statusBarsPadding()) {
                     if (vm.lockEnabled && vm.locked) LockScreen(vm)
-                    else if (vm.onboardingDone) MainScaffold(vm)
-                    else OnboardingScreen(vm)
+                    else if (!vm.onboardingDone) OnboardingScreen(vm)
+                    else if (!Entitlement.loggedIn) LoginScreen()
+                    else if (Entitlement.deviceLocked) DeviceLockedScreen()
+                    else MainScaffold(vm)
                 }
             }
             EdgeGlow(vm)
@@ -169,7 +175,7 @@ fun MainScaffold(vm: AppViewModel) {
     )
     val moreRoutes = setOf("more", "apps", "calc", "support", "vision")
     Scaffold(
-        topBar = { },
+        topBar = { LicenceBanner() },
         snackbarHost = { SnackbarHost(snack) },
         bottomBar = {
             val imeUp = WindowInsets.ime.getBottom(androidx.compose.ui.platform.LocalDensity.current) > 0
@@ -210,8 +216,8 @@ fun MainScaffold(vm: AppViewModel) {
             composable("device") { DeviceScreen() }
             composable("support") { SupportScreen(vm) }
             composable("profiles") { ProfilesScreen(vm) }
-            composable("vision") { VisionScreen(vm) }
-            composable("camera") { CameraScreen(vm) }
+            composable("vision") { if (Entitlement.canCamera()) VisionScreen(vm) else FeatureLocked("camera") }
+            composable("camera") { if (Entitlement.canCamera()) CameraScreen(vm) else FeatureLocked("camera") }
         }
     }
 }

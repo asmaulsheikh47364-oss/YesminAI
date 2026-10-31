@@ -195,7 +195,7 @@ class LiveVoice(
                     if (nm == "get_location") {
                         val locId = c.optString("id")
                         Thread {
-                            val locRes = LocationHelper.describe(context)
+                            val locRes = if (Entitlement.canLocation()) LocationHelper.describe(context) else Entitlement.deny("location")
                             val locOne = JSONArray().put(JSONObject().put("id", locId).put("name", "get_location").put("response", JSONObject().put("result", locRes)))
                             ws?.send(JSONObject().put("toolResponse", JSONObject().put("functionResponses", locOne)).toString())
                         }.also { it.isDaemon = true }.start()
@@ -227,8 +227,8 @@ class LiveVoice(
                     val result = when (nm) {
                         "get_current_time" -> f.format(java.util.Date()) + " IST"
                         "get_location" -> LocationHelper.describe(context)
-                        "read_screen" -> YesminAccessibilityService.instance?.dumpScreen() ?: if (YesminAccessibilityService.isEnabledInSettings(context)) "Accessibility Android Settings mein ON hai, lekin Payal service abhi connect nahi hai. Screen abhi read nahi ho pa rahi." else "Accessibility Android Settings mein OFF dikh rahi hai."
-                        "recent_activity" -> YesminAccessibilityService.instance?.recentActivity()
+                        "read_screen" -> if (!Entitlement.canScreen()) Entitlement.deny("screen") else YesminAccessibilityService.instance?.dumpScreen() ?: if (YesminAccessibilityService.isEnabledInSettings(context)) "Accessibility Android Settings mein ON hai, lekin Payal service abhi connect nahi hai. Screen abhi read nahi ho pa rahi." else "Accessibility Android Settings mein OFF dikh rahi hai."
+                        "recent_activity" -> if (!Entitlement.canScreen()) Entitlement.deny("screen") else YesminAccessibilityService.instance?.recentActivity()
                             ?: if (YesminAccessibilityService.isEnabledInSettings(context))
                                 "Accessibility Android Settings mein ON hai, lekin Payal service abhi connect nahi hai."
                             else

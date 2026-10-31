@@ -50,6 +50,8 @@ fun SettingsScreen(vm: AppViewModel, nav: NavHostController) {
             CharacterPicker(vm)
         }
 
+        AccountCard()
+
         MissingPermissions()
 
         Section("Kaam ka glass panel") {

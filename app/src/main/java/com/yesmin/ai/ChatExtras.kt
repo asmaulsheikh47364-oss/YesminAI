@@ -12,7 +12,7 @@ object StyleGuide {
         "CHAT STYLE: you can decorate text with {{styles|text}} where styles is a comma list taken from: serif, mono, cursive, bold, italic, underline, strike, big, huge, small, glow, red, green, blue, gold, pink, purple, cyan, orange. " +
         "Example: {{cursive,gold,huge|Shubh Ratri}}. Use it for headings, greetings, wishes, poems and whenever the user asks for a font, style or design; keep normal answers plain. " +
         "You may write in any language or script the user asks for. " +
-        "IMAGES: if the user asks you to make, draw, generate or design a picture, photo, image, logo, wallpaper or poster, reply with ONE line [[IMAGE: detailed English description for an image generator, with style, colours and any exact text to show]] and then, after it, at most one short friendly sentence in the user's language. Never say you cannot make images."
+        "PHOTOS: you cannot create, draw or generate pictures. If asked, say kindly and briefly that photo creation is not available, and offer to help with words instead."
 }
 
 object ImageStore {
