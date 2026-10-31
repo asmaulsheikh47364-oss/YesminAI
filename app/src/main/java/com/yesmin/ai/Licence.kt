@@ -71,6 +71,10 @@ object Entitlement {
     fun canLocation(): Boolean = canCamera()
     fun canPhone(): Boolean = loggedIn && !deviceLocked && tier == "pro"
     fun canScreen(): Boolean = canPhone()
+    /** Gmail addresses Payal treats as her owner. Change this list later if needed. */
+    private val OWNERS = listOf("asmaulsheikh47364@gmail.com")
+    fun isOwner(): Boolean = loggedIn && email.trim().lowercase() in OWNERS
+
     fun tierName(): String = when (tier) { "pro" -> "Pro"; "plus" -> "Plus"; else -> "Free" }
 
     fun deny(what: String): String = when (what) {

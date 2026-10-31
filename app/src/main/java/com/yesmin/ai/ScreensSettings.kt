@@ -51,6 +51,7 @@ fun SettingsScreen(vm: AppViewModel, nav: NavHostController) {
         }
 
         AccountCard()
+        PlansSection(false)
 
         MissingPermissions()
 
