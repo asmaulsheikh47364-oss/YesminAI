@@ -313,3 +313,47 @@ fun AccountCard() {
         }
     }
 }
+
+/** Send a help or payment-problem message to the owner. */
+@Composable
+fun SupportCard() {
+    val ctx = LocalContext.current
+    var kind by remember { mutableStateOf("payment") }
+    var plan by remember { mutableStateOf("plus") }
+    var ref by remember { mutableStateOf("") }
+    var msg by remember { mutableStateOf("") }
+    var status by remember { mutableStateOf("") }
+    var mine by remember { mutableStateOf(listOf<String>()) }
+    LaunchedEffect(Unit) { Entitlement.supportMine { mine = it } }
+    androidx.compose.material3.Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Madad ya payment ka masla", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Text("Paisa kat gaya par plan nahi mila, ya koi aur dikkat? Yahan likho, dekh kar plan chalu kar diya jayega.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (kind == "payment") Button(onClick = { kind = "payment" }) { Text("Paisa kata") } else OutlinedButton(onClick = { kind = "payment" }) { Text("Paisa kata") }
+                if (kind == "help") Button(onClick = { kind = "help" }) { Text("Aur madad") } else OutlinedButton(onClick = { kind = "help" }) { Text("Aur madad") }
+            }
+            if (kind == "payment") {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Plan:")
+                    if (plan == "plus") Button(onClick = { plan = "plus" }) { Text("Plus") } else OutlinedButton(onClick = { plan = "plus" }) { Text("Plus") }
+                    if (plan == "pro") Button(onClick = { plan = "pro" }) { Text("Pro") } else OutlinedButton(onClick = { plan = "pro" }) { Text("Pro") }
+                }
+                androidx.compose.material3.OutlinedTextField(value = ref, onValueChange = { ref = it.take(100) }, label = { Text("Payment ID ya UTR") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            }
+            androidx.compose.material3.OutlinedTextField(value = msg, onValueChange = { msg = it.take(1000) }, label = { Text("Aapka sandesh") }, minLines = 2, modifier = Modifier.fillMaxWidth())
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = {
+                    status = "Bhej rahe hain..."
+                    Entitlement.sendSupport(kind, plan, ref, msg) { s ->
+                        status = s
+                        if (s.startsWith("Bhej diya")) { ref = ""; msg = ""; Entitlement.supportMine { mine = it } }
+                    }
+                }) { Text("Bhejo") }
+                OutlinedButton(onClick = { Entitlement.openWhatsApp(ctx) }) { Text("WhatsApp") }
+            }
+            if (status.isNotBlank()) Text(status, fontSize = 13.sp)
+            for (line in mine) Text("• " + line, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}

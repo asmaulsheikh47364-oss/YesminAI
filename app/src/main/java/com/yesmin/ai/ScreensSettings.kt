@@ -53,6 +53,8 @@ fun SettingsScreen(vm: AppViewModel, nav: NavHostController) {
         AccountCard()
         PlansSection(false)
 
+        SupportCard()
+
         MissingPermissions()
 
         Section("Kaam ka glass panel") {

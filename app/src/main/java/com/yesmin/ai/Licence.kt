@@ -242,6 +242,33 @@ object Entitlement {
         }.also { it.isDaemon = true }.start()
     }
 
+    // ---------- help / payment problem messages ----------
+    fun sendSupport(kind: String, plan: String, ref: String, msg: String, cb: (String) -> Unit) {
+        Thread {
+            val a = JSONObject().put("p_kind", kind).put("p_ref", ref).put("p_message", msg)
+            if (kind == "payment") a.put("p_plan", plan) else a.put("p_plan", JSONObject.NULL)
+            val j = rpc("support_send", a)
+            val t = if (j == null) "Bhej nahi paaye. Internet dekho aur dobara try karo." else if (j.has("error")) j.optString("error") else "Bhej diya. Jaldi dekha jayega."
+            cb(t)
+        }.also { it.isDaemon = true }.start()
+    }
+
+    fun supportMine(cb: (List<String>) -> Unit) {
+        Thread {
+            val j = rpc("support_mine", JSONObject())
+            val out = ArrayList<String>()
+            val arr = j?.optJSONArray("items")
+            if (arr != null) {
+                for (i in 0 until arr.length()) {
+                    val o = arr.getJSONObject(i)
+                    val done = o.optString("status") == "done"
+                    val note = if (o.isNull("admin_note")) "" else o.optString("admin_note")
+                    out.add((if (done) "Ho gaya: " else "Intezaar: ") + (if (note.isNotBlank()) note else if (o.optString("kind") == "payment") "payment ka masla" else "madad"))
+                }
+            }
+            cb(out)
+        }.also { it.isDaemon = true }.start()
+    }
     // ---------- helpers for the UI ----------
     fun openPlans(ctx: Context) {
         try { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(SITE + "#plans")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } catch (e: Exception) {}
